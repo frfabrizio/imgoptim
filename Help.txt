@@ -1,0 +1,97 @@
+imgoptim v0.1.0
+Usage:
+  imgoptim [global options] [format options] <filenames...>
+  imgoptim convert [global options] [convert options] <filenames...>
+
+GLOBAL OPTIONS
+  -d<path>, --dest=<path>
+                    alternative destination directory (default: overwrite input)
+  -o, --overwrite   overwrite target file even if it exists
+  -p, --preserve    preserve file timestamps
+  -n, --noaction    dry-run: don't write files, just print results
+  -f, --force       force processing (even if it may not reduce size)
+  -T<threshold>, --threshold=<threshold>
+                    keep old file if gain is below threshold (%)
+  -S<size>, --size=<size>
+                    try to reach target size (disables default lossless mode)
+                    size is in KB (1..n) or percent (1%..99%)
+  -t, --totals      print totals after processing all files
+  -q, --quiet       quiet mode
+  -v, --verbose     verbose mode
+  -h, --help        display this help and exit
+  -V, --version     print program version
+
+NAMING / OUTPUT FILE POLICY
+      --name-suffix <s>
+                    append suffix before extension (e.g. "_imgoptim")
+                    Example: "photo.jpeg" -> "photo_imgoptim.jpeg"
+                    Note: when used with `convert`, extension changes to target format
+      --keep-ext        keep original extension (write alongside using suffix)
+      --inplace         replace extension in destination (default if --dest not set)
+
+FORMAT SELECTION / FILTERING
+      --only <fmt>  process only given format(s): jpeg,png,webp,jxl (repeatable)
+      --skip <fmt>  skip given format(s): jpeg,png,webp,jxl (repeatable)
+
+METADATA / STRIPPING (applies when supported by format)
+      --strip-all       remove all metadata (EXIF/XMP/IPTC/ICC/COM as applicable)
+      --strip-exif      remove EXIF metadata
+      --strip-xmp       remove XMP metadata
+      --strip-iptc      remove IPTC metadata
+      --strip-icc       remove ICC profile
+      --strip-com       remove JPEG comment markers (COM)
+      --keep-metadata   override strip options (keep everything)
+
+METADATA / TAGGING
+      --tag-category <text>
+                    add a category label in metadata when supported (e.g. "Optimisé")
+                    Notes:
+                      - Preferred target is XMP (dc:subject / lr:hierarchicalSubject),
+                        fallback to IPTC keywords when available.
+                      - If metadata is stripped (--strip-all), tagging is ignored unless
+                        --keep-metadata is explicitly set.
+
+COMMON QUALITY / LOSSY CONTROLS (mapped per format)
+  -m<quality>, --max=<quality>
+                    JPEG: set maximum quality (0..100) (lossy)
+                    WebP: maps to --webp-quality if input is WebP
+                    JXL : maps to --jxl-quality if input is JXL
+      --quality <q>     generic quality (0..100), format-specific mapping
+
+JPEG OPTIONS
+      --all-normal
+      --all-progressive
+      --jpeg-turbo      prefer libjpeg-turbo backend when available
+
+PNG OPTIONS
+      --png-level <n>   compression level 0..9 (default: 6)
+      --zopfli          use Zopfli (very slow, best compression)
+
+WEBP OPTIONS
+      --webp-quality <q>    lossy quality 0..100 (default: 75)
+      --webp-lossless       force lossless encoding
+      --webp-method <n>     effort 0..6 (default: 4)
+
+JXL (JPEG XL) OPTIONS
+      --jxl-quality <q>     quality 0..100 (lossy)
+      --jxl-distance <d>    distance 0.0 (lossless) .. 3.0+ (lossy)
+      --jxl-effort <n>      effort 1..9 (default: 7)
+      --jxl-lossless        force lossless
+
+CONVERSION
+Usage:
+  imgoptim convert [options] <filenames...>
+
+CONVERT OPTIONS
+      --output <fmt>    target format: jpeg,png,webp,jxl
+      --input <fmt>     only convert files matching input format (optional)
+      --lossless        request lossless conversion when possible
+      --lossy           allow lossy conversion when needed
+      --background <hex>
+                    background color for alpha removal when converting to JPEG
+                    (e.g. #ffffff). Default: #ffffff
+
+EXAMPLES
+  imgoptim --name-suffix "_imgoptim" *.jpg
+  imgoptim convert --output webp --name-suffix "_imgoptim" images/*.png
+  imgoptim --tag-category "Optimisé" --strip-exif photos/*.jpg

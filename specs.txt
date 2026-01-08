@@ -1,0 +1,342 @@
+Spécification du fichier help de la ligne de commande imgoptim à implémenter :
+
+imgoptim v0.1.0
+Usage:
+  imgoptim [global options] [format options] <filenames...>
+  imgoptim convert [global options] [convert options] <filenames...>
+
+GLOBAL OPTIONS
+  -d<path>, --dest=<path>
+                    alternative destination directory (default: overwrite input)
+  -o, --overwrite   overwrite target file even if it exists
+  -p, --preserve    preserve file timestamps
+  -n, --noaction    dry-run: don't write files, just print results
+  -f, --force       force processing (even if it may not reduce size)
+  -T<threshold>, --threshold=<threshold>
+                    keep old file if gain is below threshold (%)
+  -S<size>, --size=<size>
+                    try to reach target size (disables default lossless mode)
+                    size is in KB (1..n) or percent (1%..99%)
+  -t, --totals      print totals after processing all files
+  -q, --quiet       quiet mode
+  -v, --verbose     verbose mode
+  -h, --help        display this help and exit
+  -V, --version     print program version
+
+NAMING / OUTPUT FILE POLICY
+      --name-suffix <s>
+                    append suffix before extension (e.g. "_imgoptim")
+                    Example: "photo.jpeg" -> "photo_imgoptim.jpeg"
+                    Note: when used with `convert`, extension changes to target format
+      --keep-ext        keep original extension (write alongside using suffix)
+      --inplace         replace extension in destination (default if --dest not set)
+
+FORMAT SELECTION / FILTERING
+      --only <fmt>  process only given format(s): jpeg,png,webp (repeatable)
+      --skip <fmt>  skip given format(s): jpeg,png,webp (repeatable)
+
+METADATA / STRIPPING (applies when supported by format)
+      --strip-all       remove all metadata (EXIF/XMP/IPTC/ICC/COM as applicable)
+      --strip-exif      remove EXIF metadata
+      --strip-xmp       remove XMP metadata
+      --strip-iptc      remove IPTC metadata
+      --strip-icc       remove ICC profile
+      --strip-com       remove JPEG comment markers (COM)
+      --keep-metadata   override strip options (keep everything)
+
+METADATA / TAGGING
+      --tag-category <text>
+                    add a category label in metadata when supported (e.g. "Optimisé")
+                    Notes:
+                      - Preferred target is XMP (dc:subject / lr:hierarchicalSubject),
+                        fallback to IPTC keywords when available.
+                      - If metadata is stripped (--strip-all), tagging is ignored unless
+                        --keep-metadata is explicitly set.
+
+COMMON QUALITY / LOSSY CONTROLS (mapped per format)
+  -m<quality>, --max=<quality>
+                    JPEG: set maximum quality (0..100) (lossy)
+                    WebP: not supported (lossless only)
+      --quality <q>     generic quality (0..100), format-specific mapping
+
+JPEG OPTIONS
+      --all-normal
+      --all-progressive
+      --jpeg-turbo      prefer libjpeg-turbo backend when available
+
+PNG OPTIONS
+      --png-level <n>   compression level 0..9 (default: 6)
+      --zopfli          use Zopfli (very slow, best compression)
+
+WEBP OPTIONS
+      --webp-lossless       force lossless encoding (only supported mode)
+      --webp-quality <q>    not supported (lossless only)
+      --webp-method <n>     not supported (lossless only)
+
+CONVERSION
+Usage:
+  imgoptim convert [options] <filenames...>
+
+CONVERT OPTIONS
+      --output <fmt>    target format: jpeg,png,webp
+      --input <fmt>     only convert files matching input format (optional)
+      --lossless        request lossless conversion when possible
+      --lossy           allow lossy conversion when needed
+      --background <hex>
+                    background color for alpha removal when converting to JPEG
+                    (e.g. #ffffff). Default: #ffffff
+      --resize <spec>
+                    resize images: WxH, Wx, xH (convert only)
+      --fit <mode>
+                    fit mode for resize: contain, cover, stretch
+
+EXAMPLES
+  imgoptim --name-suffix "_imgoptim" *.jpg
+  imgoptim convert --output webp --name-suffix "_imgoptim" images/*.png
+  imgoptim --tag-category "Optimisé" --strip-exif photos/*.jpg
+
+
+Voici une spécification “règles & priorités” (comportement déterministe) entre les paramètres, organisée par thèmes. Elle vise à éviter les surprises, notamment avec --strip-*, --keep-metadata, --tag-category, --size, et la politique de nommage.
+
+1) Résolution des conflits et ordre d’application
+
+Pour chaque fichier, l’ordre logique est :
+
+Filtrage (formats, existence, etc.)
+
+Décision d’action : optimiser / convertir / ignorer
+
+Détermination du mode : lossless par défaut vs lossy
+
+Traitement image (encode/optimise)
+
+Traitement métadonnées (strip/keep/tag)
+
+Écriture (chemin, collisions, timestamps)
+
+Seuil/threshold (remplacement ou non du fichier cible)
+
+Les règles ci-dessous s’insèrent dans cet ordre.
+
+2) Filtrage formats : --only / --skip
+
+--only et --skip peuvent être combinés.
+
+Priorité : --only restreint, puis --skip exclut.
+
+Exemple : --only jpeg,png --skip png ⇒ seuls les JPEG restent.
+
+Si après filtrage il ne reste aucun fichier : code retour “succès” mais message (sauf --quiet).
+
+3) Choix action : optimize vs convert
+
+imgoptim <files...> ⇒ optimisation (même format en sortie).
+
+imgoptim convert <files...> ⇒ conversion (format en sortie défini par --output).
+
+En mode convert, si --output n’est pas fourni ⇒ erreur (code retour ≠ 0).
+
+--input <fmt> en mode convert : ne convertit que les fichiers dont le format détecté correspond.
+
+Ne force pas un parse “au nom d’extension” : c’est la détection (magic bytes) qui tranche.
+
+4) Mode lossless / lossy : règles générales
+4.1 Mode par défaut
+
+Par défaut : lossless quand le format/le pipeline le permet.
+
+Passage en lossy si (priorité) :
+
+--size <...> est utilisé (optimisation/convert)
+
+un paramètre explicitement lossy est présent (--max, --quality, etc.)
+
+convert --lossy est fourni
+
+4.2 Flags convert --lossless/--lossy
+
+--lossless et --lossy sont mutuellement exclusifs.
+
+Si aucun des deux n’est fourni :
+
+conversion essaye lossless si possible ; sinon bascule en lossy si nécessaire
+
+Si --lossless est fourni :
+
+si conversion lossless impossible ⇒ erreur (code retour ≠ 0) sauf si --force est présent, auquel cas on convertit en lossy avec avertissement (sauf --quiet).
+
+Si --lossy est fourni :
+
+force un encodage lossy même si lossless possible.
+
+4.3 --size (cible taille)
+
+--size désactive explicitement le mode lossless par défaut.
+
+Si --size est utilisé avec un flag de qualité (--max, --quality, etc.) :
+
+priorité : --size prime, la qualité devient un plafond (ex : ne jamais dépasser 85), utilisé comme contrainte secondaire si l’algorithme itératif le permet.
+
+Si la taille cible est irréalisable sans dégrader au-delà des limites techniques :
+
+si --force : on génère le meilleur résultat atteint et on log “target not reached”
+
+sinon : on conserve l’original (comme un “échec non fatal”), sortie code 0 mais warning (sauf --quiet)
+
+5) Seuil de gain : --threshold
+
+S’applique à la décision de remplacer le fichier cible.
+
+Calcul : gain% = 100 * (old_size - new_size) / old_size.
+
+Si gain% < threshold :
+
+alors on ne remplace pas (on garde l’ancien fichier cible)
+
+et on supprime l’output temporaire.
+
+--force ignore --threshold (on remplace quand même), mais on log l’info en --verbose.
+
+6) Dry-run : --noaction
+
+Ne crée/modifie aucun fichier.
+
+Doit quand même :
+
+parser, estimer/mesurer (si possible) et afficher les résultats,
+
+simuler le nom de sortie, les décisions (strip/tag), et le gain estimé.
+
+Si une opération nécessite une écriture réelle pour mesurer (certains encodeurs) :
+
+on autorise un buffer mémoire, jamais de fichier sur disque.
+
+7) Politique de sortie : --dest, --overwrite, --name-suffix, --inplace, --keep-ext
+7.1 Chemin de sortie (ordre)
+
+Si --dest est fourni : la sortie va dans ce répertoire (en conservant le nom de base).
+
+Sinon : sortie “in-place” (même dossier que l’entrée).
+
+7.2 Nom de fichier (ordre)
+
+Nom de base = nom d’entrée sans extension.
+
+Si --name-suffix <s> : sortie = {base}{s}.{ext_sortie}
+
+Sinon :
+
+en optimisation : {base}.{ext_entrée}
+
+en conversion : {base}.{ext_sortie}
+
+7.3 --inplace et --keep-ext
+
+Mutuellement exclusifs.
+
+En optimisation :
+
+--inplace n’a pas d’effet (déjà inplace par défaut), sauf si --dest est défini (inplace = même nom dans dest).
+
+--keep-ext n’a pas de sens (extension ne change pas), donc ignoré avec warning (sauf --quiet).
+
+En conversion :
+
+--inplace : remplace l’extension par celle de --output.
+
+--keep-ext : conserve l’extension d’origine et écrit avec suffixe obligatoire :
+
+si --name-suffix absent ⇒ suffixe implicite .conv (ou _conv, au choix, mais fixe et documenté)
+
+sinon utilise --name-suffix
+
+7.4 Collisions et --overwrite
+
+Si fichier cible existe :
+
+sans --overwrite ⇒ erreur (code retour ≠ 0) pour ce fichier, continue les autres (code global ≠ 0 si au moins une erreur)
+
+avec --overwrite ⇒ remplace (écriture atomique via fichier temporaire + rename)
+
+8) Préservation timestamps : --preserve
+
+Si --preserve :
+
+copie mtime (et idéalement atime si support) du fichier source vers le fichier cible après écriture complète.
+
+Si sortie conservée identique (threshold non atteint ou échec) :
+
+ne touche pas aux timestamps.
+
+9) Métadonnées : --strip-*, --strip-all, --keep-metadata, --tag-category
+9.1 Principes
+
+Par défaut : on conserve les métadonnées existantes (quand possible).
+
+--keep-metadata sert de verrou : il interdit toute suppression via --strip-*.
+
+9.2 Priorité des flags “strip/keep”
+
+--keep-metadata a la priorité la plus haute.
+
+Si --keep-metadata est présent : tous les --strip-* sont ignorés (warning en verbose).
+
+Sinon :
+
+--strip-all active la suppression maximale (selon capacités du format).
+
+--strip-* spécifiques affinent le set à supprimer.
+
+Si --strip-all + --strip-exif etc. : c’est redondant (pas d’erreur).
+
+9.3 Application par format (norme de comportement)
+
+JPEG : EXIF/XMP/IPTC/ICC/COM selon options.
+
+PNG : chunks (iCCP/eXIf/iTXt/tEXt/zTXt/sRGB/pHYs etc.) selon mapping des options strip.
+
+WebP : XMP/EXIF/ICC (conteneurs WebP).
+
+ : métadonnées conteneur (EXIF/XMP/ICC) selon support encoder/décodeur.
+
+9.4 Tagging : --tag-category <text>
+
+Ajoute une catégorie “métier” (ex. “Optimisé”) si le format supporte l’écriture de métadonnées.
+
+Cible d’écriture (ordre) :
+
+XMP (keywords/subject) si supporté
+
+IPTC keywords si supporté
+
+sinon : non supporté ⇒ warning en verbose, pas d’erreur
+
+Interaction avec strip :
+
+Si --keep-metadata : on conserve tout et on ajoute le tag.
+
+Si --strip-all (sans keep) : tag ignoré (car on a demandé suppression maximale).
+
+Si strips partiels : le tag est appliqué après suppression, donc il reste présent sauf si la cible d’écriture (XMP/IPTC) fait partie de ce qui est strippé et que l’implémentation ne peut pas réinjecter (dans ce cas on tente réinjection ; si impossible ⇒ warning).
+
+10) Logging : --quiet, --verbose, --totals
+
+--quiet supprime tout sauf erreurs critiques (et éventuellement résumé minimal si --totals).
+
+--verbose affiche décisions : mode lossless/lossy, règles strip/tag appliquées, chemin cible, gain, seuil.
+
+--totals imprime : nb fichiers, nb optimisés, nb convertis, nb inchangés (threshold), erreurs, octets gagnés.
+
+11) Règles de sortie (exit codes)
+
+Code 0 si :
+
+aucun “hard error” (ex : parse impossible, écriture refusée sans overwrite, options invalides, etc.)
+
+les fichiers ignorés par filtre ou threshold ne comptent pas comme erreurs.
+
+Code non-zéro si :
+
+au moins un fichier a rencontré une erreur bloquante
+
+ou options invalides / combinaison interdite (ex --inplace + --keep-ext, convert sans --output, --lossless + --lossy).
