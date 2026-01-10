@@ -2,9 +2,9 @@ use std::path::Path;
 
 use crate::cli::{Fmt, Mode, Opts, TargetSize};
 use crate::error::ImgOptimError;
-use crate::formats::{self, ImageFormat};
 use crate::formats::convert::{RawColor, RawImage};
 use crate::formats::resize::{resize_rgb_bilinear, resize_rgba_bilinear};
+use crate::formats::{self, ImageFormat};
 use crate::rules::naming::make_output_path;
 use crate::rules::resize::parse_resize_spec;
 use crate::rules::threshold::{gain_percent, should_replace};
@@ -59,7 +59,10 @@ fn old_size_for_target(input: &Path, out: &Path) -> Result<u64, ImgOptimError> {
 ///
 /// Note: current CLI (`cli.rs`) does not expose `png_level`, `zopfli`, `webp_method`,
 /// so we provide safe defaults here.
-fn build_optimize_options(opts: &Opts, out_fmt: ImageFormat) -> crate::formats::convert::OptimizeOptions {
+fn build_optimize_options(
+    opts: &Opts,
+    out_fmt: ImageFormat,
+) -> crate::formats::convert::OptimizeOptions {
     // Progressive: CLI has all_normal/all_progressive. We model progressive as a single bool.
     let progressive = opts.all_progressive;
 
@@ -68,14 +71,11 @@ fn build_optimize_options(opts: &Opts, out_fmt: ImageFormat) -> crate::formats::
         true
     } else {
         match (opts.mode, out_fmt) {
-        (Mode::Convert, ImageFormat::Webp) => {
-            opts.convert
-                .as_ref()
-                .map(|c| !c.lossy)
-                .unwrap_or(true)
-        }
-        (Mode::Optimize, ImageFormat::Webp) => true,
-        _ => false,
+            (Mode::Convert, ImageFormat::Webp) => {
+                opts.convert.as_ref().map(|c| !c.lossy).unwrap_or(true)
+            }
+            (Mode::Optimize, ImageFormat::Webp) => true,
+            _ => false,
         }
     };
 
@@ -191,7 +191,7 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
             raw = apply_resize(raw, spec, fit);
         }
 
-        if let Some(target) = opts.target_size_parsed.clone() {
+        if let Some(target) = opts.target_size_parsed {
             let input_size = std::fs::metadata(input)?.len();
             let target_bytes = match target {
                 TargetSize::KiloBytes(kb) => kb * 1024,
@@ -213,7 +213,14 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
                     bytes.len(),
                     out_path.display()
                 );
-                record_success(opts.mode, detected, out_fmt, old_bytes, bytes.len() as u64, false);
+                record_success(
+                    opts.mode,
+                    detected,
+                    out_fmt,
+                    old_bytes,
+                    bytes.len() as u64,
+                    false,
+                );
                 return Ok(summary);
             }
             bytes
@@ -368,21 +375,33 @@ fn decode_raw(input: &[u8], fmt: ImageFormat) -> Result<RawImage, ImgOptimError>
     match fmt {
         ImageFormat::Jpeg => {
             #[cfg(feature = "jpeg")]
-            { crate::formats::jpeg::decode_to_raw(input) }
+            {
+                crate::formats::jpeg::decode_to_raw(input)
+            }
             #[cfg(not(feature = "jpeg"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Jpeg)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Jpeg))
+            }
         }
         ImageFormat::Png => {
             #[cfg(feature = "png")]
-            { crate::formats::png::decode_to_raw(input) }
+            {
+                crate::formats::png::decode_to_raw(input)
+            }
             #[cfg(not(feature = "png"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Png)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Png))
+            }
         }
         ImageFormat::Webp => {
             #[cfg(feature = "webp")]
-            { crate::formats::webp::decode_to_raw(input) }
+            {
+                crate::formats::webp::decode_to_raw(input)
+            }
             #[cfg(not(feature = "webp"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Webp)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Webp))
+            }
         }
     }
 }
@@ -396,26 +415,42 @@ fn encode_from_raw(
     match fmt {
         ImageFormat::Jpeg => {
             #[cfg(feature = "jpeg")]
-            { crate::formats::jpeg::encode_from_raw(raw, opts, background) }
+            {
+                crate::formats::jpeg::encode_from_raw(raw, opts, background)
+            }
             #[cfg(not(feature = "jpeg"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Jpeg)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Jpeg))
+            }
         }
         ImageFormat::Png => {
             #[cfg(feature = "png")]
-            { crate::formats::png::encode_from_raw(raw, opts) }
+            {
+                crate::formats::png::encode_from_raw(raw, opts)
+            }
             #[cfg(not(feature = "png"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Png)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Png))
+            }
         }
         ImageFormat::Webp => {
             #[cfg(feature = "webp")]
-            { crate::formats::webp::encode_from_raw(raw, opts) }
+            {
+                crate::formats::webp::encode_from_raw(raw, opts)
+            }
             #[cfg(not(feature = "webp"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Webp)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Webp))
+            }
         }
     }
 }
 
-fn apply_resize(raw: RawImage, spec: crate::rules::resize::ResizeSpec, fit: crate::cli::FitMode) -> RawImage {
+fn apply_resize(
+    raw: RawImage,
+    spec: crate::rules::resize::ResizeSpec,
+    fit: crate::cli::FitMode,
+) -> RawImage {
     match raw.color {
         RawColor::Rgba8 => {
             let (w, h, pixels) =

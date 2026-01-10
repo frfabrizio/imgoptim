@@ -261,7 +261,10 @@ mod png_to_jpeg {
         let xmp = jpeg_extract_xmp(&bytes).expect("XMP not found in JPEG");
         let xmp_s = String::from_utf8_lossy(&xmp);
 
-        assert!(xmp_s.contains("Optimis??"), "tag-category not found in JPEG XMP");
+        assert!(
+            xmp_s.contains("Optimis??"),
+            "tag-category not found in JPEG XMP"
+        );
     }
 }
 
@@ -337,7 +340,11 @@ mod webp_to_png {
         let out_dir = tmp_out_dir();
 
         let input_jpeg = asset_path("tests/assets/jpeg/photo_nometa.jpg");
-        assert!(input_jpeg.exists(), "missing asset: {}", input_jpeg.display());
+        assert!(
+            input_jpeg.exists(),
+            "missing asset: {}",
+            input_jpeg.display()
+        );
 
         run_ok(&[
             "--keep-metadata",
@@ -375,9 +382,12 @@ mod webp_to_png {
         let png_bytes = read_bytes(&png_out);
         assert_is_png(&png_bytes);
 
-        let xmp = png_extract_xmp(&png_bytes)
-            .expect("XMP not found in PNG after WebP->PNG roundtrip");
+        let xmp =
+            png_extract_xmp(&png_bytes).expect("XMP not found in PNG after WebP->PNG roundtrip");
         let xmp_s = String::from_utf8_lossy(&xmp);
-        assert!(xmp_s.contains("Optimis?"), "tag-category not found in PNG XMP");
+        assert!(
+            xmp_s.contains("Optimis?"),
+            "tag-category not found in PNG XMP"
+        );
     }
 }

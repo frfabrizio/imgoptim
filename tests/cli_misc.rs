@@ -2,9 +2,9 @@ mod common;
 
 use common::*;
 
-use std::fs;
 use filetime::{set_file_mtime, FileTime};
 use png::{BitDepth, ColorType, Encoder};
+use std::fs;
 
 #[test]
 fn convert_background_affects_output_bytes() {
@@ -86,7 +86,10 @@ fn noaction_does_not_write_output() {
     ]);
 
     let out = out_dir.path().join("image_nometa_imgoptim.png");
-    assert!(!out.exists(), "output should not be created in noaction mode");
+    assert!(
+        !out.exists(),
+        "output should not be created in noaction mode"
+    );
 }
 
 #[test]

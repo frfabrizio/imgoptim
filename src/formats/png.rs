@@ -14,8 +14,8 @@
 //!   the original PNG structure (chunks ordering, ancillary chunks) unless you re-inject metadata.
 //! - Metadata preservation hooks are provided as no-op by default.
 
-use crate::formats::convert::{ImageCodec, OptimizeOptions, RawColor, RawImage};
 use crate::error::{ImgOptimError, ResultError};
+use crate::formats::convert::{ImageCodec, OptimizeOptions, RawColor, RawImage};
 use crate::formats::ImageFormat;
 
 use png::{BitDepth, ColorType, Decoder, Encoder, Transformations};
@@ -259,7 +259,6 @@ fn map_png_level_to_compression(level: Option<u8>) -> png::Compression {
     }
 }
 
-
 /* ----------------------------- Metadata hooks ----------------------------- */
 
 pub fn inject_png_meta(
@@ -275,9 +274,8 @@ pub fn inject_png_meta(
         return Err(ImgOptimError::Processing("invalid PNG signature".into()));
     }
 
-    let extra = exif.map_or(0, |v| v.len())
-        + icc.map_or(0, |v| v.len())
-        + xmp.map_or(0, |v| v.len());
+    let extra =
+        exif.map_or(0, |v| v.len()) + icc.map_or(0, |v| v.len()) + xmp.map_or(0, |v| v.len());
     let mut out = Vec::with_capacity(input.len() + extra + 64);
     out.extend_from_slice(&input[..8]);
 
@@ -364,7 +362,6 @@ fn make_png_chunk(ctype: [u8; 4], data: &[u8]) -> Vec<u8> {
 
     out
 }
-
 
 /// Minimal metadata container (adapt to your project needs).
 #[derive(Debug, Clone, Default)]

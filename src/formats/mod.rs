@@ -112,4 +112,3 @@ pub fn is_built(fmt: ImageFormat) -> bool {
         ImageFormat::Webp => cfg!(feature = "webp"),
     }
 }
-

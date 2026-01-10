@@ -12,8 +12,8 @@
 //!   feature set and platform, WebP support may rely on external codecs.
 //!   Validate your "100% Rust" requirement at Cargo level (features/deps).
 
-use crate::formats::convert::{ImageCodec, OptimizeOptions, RawColor, RawImage};
 use crate::error::{ImgOptimError, ResultError};
+use crate::formats::convert::{ImageCodec, OptimizeOptions, RawColor, RawImage};
 use crate::formats::ImageFormat;
 
 use std::io::Cursor;
@@ -129,7 +129,6 @@ fn decode_webp_to_rgba8(input: &[u8]) -> ResultError<RgbaImage> {
 
     // Decode to raw buffer in the decoder's native output, then normalize.
     let mut raw = vec![0u8; decoder.total_bytes() as usize];
-    let decoder = decoder;
     decoder
         .read_image(&mut raw)
         .map_err(|e| ImgOptimError::Processing(format!("WebP decode failed: {e}")))?;
@@ -175,13 +174,8 @@ fn encode_webp_lossless(img: &RgbaImage) -> ResultError<Vec<u8>> {
     // The `image` crate exposes a lossless WebP encoder constructor.
     let enc = WebPEncoder::new_lossless(&mut out);
 
-    enc.encode(
-        &img.pixels,
-        img.width,
-        img.height,
-        ColorType::Rgba8.into(),
-    )
-    .map_err(|e| ImgOptimError::Processing(format!("WebP encode failed: {e}")))?;
+    enc.encode(&img.pixels, img.width, img.height, ColorType::Rgba8.into())
+        .map_err(|e| ImgOptimError::Processing(format!("WebP encode failed: {e}")))?;
 
     Ok(out)
 }

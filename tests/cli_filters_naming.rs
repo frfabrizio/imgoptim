@@ -23,7 +23,10 @@ fn convert_only_filter_skips_non_matching_input() {
     ]);
 
     let out = out_dir.path().join("image_nometa_imgoptim.jpg");
-    assert!(!out.exists(), "output should not be created when --only skips input");
+    assert!(
+        !out.exists(),
+        "output should not be created when --only skips input"
+    );
 }
 
 #[test]
@@ -47,7 +50,10 @@ fn convert_skip_filter_skips_matching_input() {
     ]);
 
     let out = out_dir.path().join("image_nometa_imgoptim.jpg");
-    assert!(!out.exists(), "output should not be created when --skip excludes input");
+    assert!(
+        !out.exists(),
+        "output should not be created when --skip excludes input"
+    );
 }
 
 #[test]
@@ -71,7 +77,10 @@ fn convert_input_filter_skips_other_formats() {
     ]);
 
     let out = out_dir.path().join("photo_meta_imgoptim.png");
-    assert!(!out.exists(), "output should not be created when --input does not match");
+    assert!(
+        !out.exists(),
+        "output should not be created when --input does not match"
+    );
 }
 
 #[test]
@@ -161,7 +170,10 @@ fn optimize_only_filter_skips_non_matching_input() {
     ]);
 
     let out = out_dir.path().join("image_nometa_imgoptim.png");
-    assert!(!out.exists(), "output should not be created when --only skips input");
+    assert!(
+        !out.exists(),
+        "output should not be created when --only skips input"
+    );
 }
 
 #[test]
@@ -182,7 +194,10 @@ fn optimize_skip_filter_skips_matching_input() {
     ]);
 
     let out = out_dir.path().join("image_nometa_imgoptim.png");
-    assert!(!out.exists(), "output should not be created when --skip excludes input");
+    assert!(
+        !out.exists(),
+        "output should not be created when --skip excludes input"
+    );
 }
 
 #[test]

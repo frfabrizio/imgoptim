@@ -102,7 +102,12 @@ pub trait ImageCodec {
 }
 
 /// Convert/optimize an on-disk file.
-pub fn convert_file(input: &Path, output: &Path, format: ImageFormat, opts: &OptimizeOptions) -> ResultError<()> {
+pub fn convert_file(
+    input: &Path,
+    output: &Path,
+    format: ImageFormat,
+    opts: &OptimizeOptions,
+) -> ResultError<()> {
     if !formats::is_built(format) {
         return Err(ImgOptimError::not_built(format));
     }
@@ -120,7 +125,11 @@ pub fn convert_file(input: &Path, output: &Path, format: ImageFormat, opts: &Opt
 }
 
 /// Convert/optimize from in-memory bytes.
-pub fn convert_bytes(input: &[u8], format: ImageFormat, opts: &OptimizeOptions) -> ResultError<Vec<u8>> {
+pub fn convert_bytes(
+    input: &[u8],
+    format: ImageFormat,
+    opts: &OptimizeOptions,
+) -> ResultError<Vec<u8>> {
     if !formats::is_built(format) {
         return Err(ImgOptimError::not_built(format));
     }
@@ -130,21 +139,33 @@ pub fn convert_bytes(input: &[u8], format: ImageFormat, opts: &OptimizeOptions) 
     match format {
         ImageFormat::Jpeg => {
             #[cfg(feature = "jpeg")]
-            { dispatch::<crate::formats::jpeg::Codec>(input, opts) }
+            {
+                dispatch::<crate::formats::jpeg::Codec>(input, opts)
+            }
             #[cfg(not(feature = "jpeg"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Jpeg)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Jpeg))
+            }
         }
         ImageFormat::Png => {
             #[cfg(feature = "png")]
-            { dispatch::<crate::formats::png::Codec>(input, opts) }
+            {
+                dispatch::<crate::formats::png::Codec>(input, opts)
+            }
             #[cfg(not(feature = "png"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Png)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Png))
+            }
         }
         ImageFormat::Webp => {
             #[cfg(feature = "webp")]
-            { dispatch::<crate::formats::webp::Codec>(input, opts) }
+            {
+                dispatch::<crate::formats::webp::Codec>(input, opts)
+            }
             #[cfg(not(feature = "webp"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Webp)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Webp))
+            }
         }
     }
 }
@@ -170,42 +191,66 @@ pub fn convert_bytes_with_input(
     let raw = match input_fmt {
         ImageFormat::Jpeg => {
             #[cfg(feature = "jpeg")]
-            { crate::formats::jpeg::decode_to_raw(input)? }
+            {
+                crate::formats::jpeg::decode_to_raw(input)?
+            }
             #[cfg(not(feature = "jpeg"))]
-            { return Err(ImgOptimError::not_built(ImageFormat::Jpeg)); }
+            {
+                return Err(ImgOptimError::not_built(ImageFormat::Jpeg));
+            }
         }
         ImageFormat::Png => {
             #[cfg(feature = "png")]
-            { crate::formats::png::decode_to_raw(input)? }
+            {
+                crate::formats::png::decode_to_raw(input)?
+            }
             #[cfg(not(feature = "png"))]
-            { return Err(ImgOptimError::not_built(ImageFormat::Png)); }
+            {
+                return Err(ImgOptimError::not_built(ImageFormat::Png));
+            }
         }
         ImageFormat::Webp => {
             #[cfg(feature = "webp")]
-            { crate::formats::webp::decode_to_raw(input)? }
+            {
+                crate::formats::webp::decode_to_raw(input)?
+            }
             #[cfg(not(feature = "webp"))]
-            { return Err(ImgOptimError::not_built(ImageFormat::Webp)); }
+            {
+                return Err(ImgOptimError::not_built(ImageFormat::Webp));
+            }
         }
     };
 
     match output_fmt {
         ImageFormat::Jpeg => {
             #[cfg(feature = "jpeg")]
-            { crate::formats::jpeg::encode_from_raw(&raw, opts, background) }
+            {
+                crate::formats::jpeg::encode_from_raw(&raw, opts, background)
+            }
             #[cfg(not(feature = "jpeg"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Jpeg)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Jpeg))
+            }
         }
         ImageFormat::Png => {
             #[cfg(feature = "png")]
-            { crate::formats::png::encode_from_raw(&raw, opts) }
+            {
+                crate::formats::png::encode_from_raw(&raw, opts)
+            }
             #[cfg(not(feature = "png"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Png)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Png))
+            }
         }
         ImageFormat::Webp => {
             #[cfg(feature = "webp")]
-            { crate::formats::webp::encode_from_raw(&raw, opts) }
+            {
+                crate::formats::webp::encode_from_raw(&raw, opts)
+            }
             #[cfg(not(feature = "webp"))]
-            { Err(ImgOptimError::not_built(ImageFormat::Webp)) }
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Webp))
+            }
         }
     }
 }

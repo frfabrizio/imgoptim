@@ -138,9 +138,7 @@ fn build_jpeg_xmp_app1(category: &str) -> Result<Vec<u8>, ImgOptimError> {
 fn build_jpeg_app1(prefix: &[u8], payload: &[u8]) -> Result<Vec<u8>, ImgOptimError> {
     let seg_len = prefix.len() + payload.len() + 2;
     if seg_len > 0xffff {
-        return Err(ImgOptimError::Processing(
-            "APP1 payload too large".into(),
-        ));
+        return Err(ImgOptimError::Processing("APP1 payload too large".into()));
     }
     let mut app1 = Vec::with_capacity(2 + 2 + prefix.len() + payload.len());
     app1.extend_from_slice(&[0xff, 0xe1]);
@@ -325,22 +323,19 @@ fn strip_jpeg_metadata(input: &[u8], strip: &StripSpec) -> Result<Vec<u8>, ImgOp
         let mut skip = false;
 
         if marker == 0xe1 {
-            if strip.strip_all || strip.strip_exif {
-                if is_app1_with_prefix(payload, EXIF_APP1_ID) {
-                    skip = true;
-                }
+            if (strip.strip_all || strip.strip_exif) && is_app1_with_prefix(payload, EXIF_APP1_ID) {
+                skip = true;
             }
-            if strip.strip_all || strip.strip_xmp {
-                if is_app1_with_prefix(payload, XMP_APP1_ID) {
-                    skip = true;
-                }
+            if (strip.strip_all || strip.strip_xmp) && is_app1_with_prefix(payload, XMP_APP1_ID) {
+                skip = true;
             }
         }
 
-        if marker == 0xe2 && (strip.strip_all || strip.strip_icc) {
-            if payload.starts_with(b"ICC_PROFILE\0") {
-                skip = true;
-            }
+        if marker == 0xe2
+            && (strip.strip_all || strip.strip_icc)
+            && payload.starts_with(b"ICC_PROFILE\0")
+        {
+            skip = true;
         }
 
         if marker == 0xed && (strip.strip_all || strip.strip_iptc) {

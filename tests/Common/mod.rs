@@ -1,8 +1,8 @@
-use std::fs;
-use std::path::{Path, PathBuf};
 use assert_cmd::assert::Assert;
 use assert_cmd::cargo::cargo_bin_cmd;
 use assert_cmd::Command;
+use std::fs;
+use std::path::{Path, PathBuf};
 use tempfile::{tempdir, TempDir};
 
 #[allow(dead_code)]
@@ -27,11 +27,7 @@ pub fn read_bytes(path: &Path) -> Vec<u8> {
 
 #[allow(dead_code)]
 pub fn expect_file_exists(path: &Path) {
-    assert!(
-        path.exists(),
-        "expected file to exist: {}",
-        path.display()
-    );
+    assert!(path.exists(), "expected file to exist: {}", path.display());
 }
 
 #[allow(dead_code)]
@@ -42,7 +38,11 @@ pub fn assert_is_png(bytes: &[u8]) {
 #[allow(dead_code)]
 pub fn assert_is_jpeg(bytes: &[u8]) {
     assert!(
-        bytes.len() >= 4 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[bytes.len() - 2] == 0xFF && bytes[bytes.len() - 1] == 0xD9,
+        bytes.len() >= 4
+            && bytes[0] == 0xFF
+            && bytes[1] == 0xD8
+            && bytes[bytes.len() - 2] == 0xFF
+            && bytes[bytes.len() - 1] == 0xD9,
         "not a JPEG"
     );
 }
@@ -215,7 +215,8 @@ pub fn webp_contains_xmp(bytes: &[u8]) -> bool {
         if fourcc == b"XMP " {
             let payload = &bytes[payload_start..payload_end];
             // On cherche juste un marqueur robuste
-            return payload.windows(b"http://ns.adobe.com/xap/1.0/".len())
+            return payload
+                .windows(b"http://ns.adobe.com/xap/1.0/".len())
                 .any(|w| w == b"http://ns.adobe.com/xap/1.0/");
         }
 

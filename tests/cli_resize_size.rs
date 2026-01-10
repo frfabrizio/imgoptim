@@ -57,5 +57,8 @@ fn convert_size_target_not_reached_skips_write() {
     ]);
 
     let out = out_dir.path().join("image_meta_tiny.jpg");
-    assert!(!out.exists(), "output should not be created when target is unreachable");
+    assert!(
+        !out.exists(),
+        "output should not be created when target is unreachable"
+    );
 }

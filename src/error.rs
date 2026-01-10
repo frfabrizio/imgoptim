@@ -1,6 +1,6 @@
+use crate::formats;
 use std::fmt;
 use std::io;
-use crate::formats;
 
 /// Type de résultat applicatif pour imgoptim
 pub type ResultError<T> = std::result::Result<T, ImgOptimError>;
@@ -18,8 +18,12 @@ pub enum ImgOptimError {
 }
 
 impl ImgOptimError {
-    pub fn not_built(detected: formats::ImageFormat) -> Self {Self::NotBuilt { detected } }
-    pub fn processing(msg: impl Into<String>) -> Self {Self::Processing(msg.into()) }
+    pub fn not_built(detected: formats::ImageFormat) -> Self {
+        Self::NotBuilt { detected }
+    }
+    pub fn processing(msg: impl Into<String>) -> Self {
+        Self::Processing(msg.into())
+    }
 }
 
 impl fmt::Display for ImgOptimError {

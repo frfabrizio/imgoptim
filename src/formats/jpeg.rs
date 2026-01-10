@@ -5,14 +5,14 @@
 //!
 //! Compatible with the trait-based router defined in `crate::formats::convert`.
 
-use crate::formats::convert::{ImageCodec, OptimizeOptions, RawColor, RawImage};
 use crate::error::{ImgOptimError, ResultError};
+use crate::formats::convert::{ImageCodec, OptimizeOptions, RawColor, RawImage};
 use crate::formats::ImageFormat;
 
 use jpeg_encoder as je;
+use zune_core::bytestream::ZCursor;
 use zune_core::colorspace::ColorSpace;
 use zune_core::options::DecoderOptions;
-use zune_core::bytestream::ZCursor;
 use zune_jpeg::JpegDecoder;
 
 pub struct Codec;
@@ -153,8 +153,8 @@ fn decode_jpeg_zune(input: &[u8]) -> ResultError<DecodedJpeg> {
         .info()
         .ok_or_else(|| ImgOptimError::Processing("JPEG decode: missing info".into()))?;
 
-    let width = info.width as u16;
-    let height = info.height as u16;
+    let width = info.width;
+    let height = info.height;
 
     // With output colorspace forced to RGB, the decoder returns RGB data for non-grayscale inputs.
     let components = info.components as usize;
@@ -162,7 +162,6 @@ fn decode_jpeg_zune(input: &[u8]) -> ResultError<DecodedJpeg> {
         1 => JpegColor::L8,
         _ => JpegColor::Rgb8,
     };
-
 
     Ok(DecodedJpeg {
         width,
@@ -192,7 +191,7 @@ fn encode_jpeg(img: &DecodedJpeg, opts: &OptimizeOptions) -> ResultError<Vec<u8>
     let mut out = Vec::with_capacity(img.pixels.len() / 2);
     let enc = je::Encoder::new(&mut out, q);
 
-        let color = match img.color {
+    let color = match img.color {
         JpegColor::L8 => je::ColorType::Luma,
         JpegColor::Rgb8 => je::ColorType::Rgb,
     };

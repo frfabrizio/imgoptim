@@ -1,4 +1,4 @@
-use imgoptim::rules::threshold::{ gain_percent, should_replace };
+use imgoptim::rules::threshold::{gain_percent, should_replace};
 
 #[test]
 fn gain_is_correct() {
@@ -9,24 +9,24 @@ fn gain_is_correct() {
 
 #[test]
 fn should_replace_no_threshold() {
-    assert_eq!(should_replace(100, 100, None, false).unwrap(), true);
-    assert_eq!(should_replace(100, 110, None, false).unwrap(), true);
+    assert!(should_replace(100, 100, None, false).unwrap());
+    assert!(should_replace(100, 110, None, false).unwrap());
 }
 
 #[test]
 fn should_not_replace_if_no_gain() {
-    assert_eq!(should_replace(100, 100, Some(1.0), false).unwrap(), false);
-    assert_eq!(should_replace(100, 110, Some(1.0), false).unwrap(), false);
+    assert!(!should_replace(100, 100, Some(1.0), false).unwrap());
+    assert!(!should_replace(100, 110, Some(1.0), false).unwrap());
 }
 
 #[test]
 fn should_replace_when_gain_meets_threshold() {
     // 10% gain
-    assert_eq!(should_replace(100, 90, Some(10.0), false).unwrap(), true);
-    assert_eq!(should_replace(100, 90, Some(10.1), false).unwrap(), false);
+    assert!(should_replace(100, 90, Some(10.0), false).unwrap());
+    assert!(!should_replace(100, 90, Some(10.1), false).unwrap());
 }
 
 #[test]
 fn force_overrides_threshold() {
-    assert_eq!(should_replace(100, 110, Some(50.0), true).unwrap(), true);
+    assert!(should_replace(100, 110, Some(50.0), true).unwrap());
 }

@@ -1,9 +1,12 @@
-use imgoptim::rules::size::parse_target_size;
 use imgoptim::cli::TargetSize;
+use imgoptim::rules::size::parse_target_size;
 
 #[test]
 fn parse_kb_ok() {
-    assert_eq!(parse_target_size("120").unwrap(), TargetSize::KiloBytes(120));
+    assert_eq!(
+        parse_target_size("120").unwrap(),
+        TargetSize::KiloBytes(120)
+    );
     assert_eq!(parse_target_size("  1 ").unwrap(), TargetSize::KiloBytes(1));
 }
 
