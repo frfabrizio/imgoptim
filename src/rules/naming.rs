@@ -9,6 +9,8 @@ fn output_ext(fmt: ImageFormat) -> &'static str {
         ImageFormat::Jpeg => "jpg",
         ImageFormat::Png => "png",
         ImageFormat::Webp => "webp",
+        ImageFormat::Tiff => "tiff",
+        ImageFormat::Jxl => "jxl",
     }
 }
 
