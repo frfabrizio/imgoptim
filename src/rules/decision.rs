@@ -31,6 +31,8 @@ fn fmt_to_cli(fmt: ImageFormat) -> Fmt {
         ImageFormat::Jpeg => Fmt::Jpeg,
         ImageFormat::Png => Fmt::Png,
         ImageFormat::Webp => Fmt::Webp,
+        ImageFormat::Tiff => Fmt::Tiff,
+        ImageFormat::Jxl => Fmt::Jxl,
     }
 }
 
@@ -98,8 +100,13 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
     // 1) Detect input format
     let detected = formats::detect::detect_format(input)?.ok_or(ImgOptimError::UnknownFormat)?;
 
-    // 2) Policy A: must be built into the binary
-    if !formats::is_built(detected) {
+    // 2) Policy A: must be built into the binary for optimize,
+    // or decodable for convert.
+    let supported = match opts.mode {
+        Mode::Optimize => formats::is_built(detected),
+        Mode::Convert => formats::is_decodable(detected),
+    };
+    if !supported {
         return Err(ImgOptimError::not_built(detected));
     }
 
@@ -145,6 +152,8 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
                 Fmt::Jpeg => ImageFormat::Jpeg,
                 Fmt::Png => ImageFormat::Png,
                 Fmt::Webp => ImageFormat::Webp,
+                Fmt::Tiff => ImageFormat::Tiff,
+                Fmt::Jxl => ImageFormat::Jxl,
             }
         }
     };
@@ -403,6 +412,26 @@ fn decode_raw(input: &[u8], fmt: ImageFormat) -> Result<RawImage, ImgOptimError>
                 Err(ImgOptimError::not_built(ImageFormat::Webp))
             }
         }
+        ImageFormat::Tiff => {
+            #[cfg(feature = "tiff")]
+            {
+                crate::formats::tiff::decode_to_raw(input)
+            }
+            #[cfg(not(feature = "tiff"))]
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Tiff))
+            }
+        }
+        ImageFormat::Jxl => {
+            #[cfg(feature = "jxl")]
+            {
+                crate::formats::jxl::decode_to_raw(input)
+            }
+            #[cfg(not(feature = "jxl"))]
+            {
+                Err(ImgOptimError::not_built(ImageFormat::Jxl))
+            }
+        }
     }
 }
 
@@ -443,6 +472,9 @@ fn encode_from_raw(
                 Err(ImgOptimError::not_built(ImageFormat::Webp))
             }
         }
+        ImageFormat::Tiff | ImageFormat::Jxl => Err(ImgOptimError::UnsupportedFormat(
+            "TIFF/JXL output is not supported".into(),
+        )),
     }
 }
 

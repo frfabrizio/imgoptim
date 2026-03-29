@@ -47,6 +47,7 @@ pub fn apply_tag_category(
         ImageFormat::Jpeg => replace_xmp_in_jpeg(input, category),
         ImageFormat::Png => replace_xmp_in_png(input, category),
         ImageFormat::Webp => inject_xmp_in_webp(input, category),
+        ImageFormat::Tiff | ImageFormat::Jxl => Ok(input.to_vec()),
     }
 }
 
@@ -104,7 +105,7 @@ pub fn strip_metadata(
     match fmt {
         ImageFormat::Jpeg => strip_jpeg_metadata(input, strip),
         ImageFormat::Png => strip_png_metadata(input, strip),
-        _ => Ok(input.to_vec()),
+        ImageFormat::Webp | ImageFormat::Tiff | ImageFormat::Jxl => Ok(input.to_vec()),
     }
 }
 

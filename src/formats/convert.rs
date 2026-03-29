@@ -90,6 +90,11 @@ impl OptimizeOptions {
                     ));
                 }
             }
+            ImageFormat::Tiff | ImageFormat::Jxl => {
+                return Err(ImgOptimError::InvalidArgs(
+                    "TIFF/JXL output is not supported".into(),
+                ));
+            }
         }
         Ok(())
     }
@@ -167,6 +172,9 @@ pub fn convert_bytes(
                 Err(ImgOptimError::not_built(ImageFormat::Webp))
             }
         }
+        ImageFormat::Tiff | ImageFormat::Jxl => Err(ImgOptimError::UnsupportedFormat(
+            "TIFF/JXL output is not supported".into(),
+        )),
     }
 }
 
@@ -219,6 +227,26 @@ pub fn convert_bytes_with_input(
                 return Err(ImgOptimError::not_built(ImageFormat::Webp));
             }
         }
+        ImageFormat::Tiff => {
+            #[cfg(feature = "tiff")]
+            {
+                crate::formats::tiff::decode_to_raw(input)?
+            }
+            #[cfg(not(feature = "tiff"))]
+            {
+                return Err(ImgOptimError::not_built(ImageFormat::Tiff));
+            }
+        }
+        ImageFormat::Jxl => {
+            #[cfg(feature = "jxl")]
+            {
+                crate::formats::jxl::decode_to_raw(input)?
+            }
+            #[cfg(not(feature = "jxl"))]
+            {
+                return Err(ImgOptimError::not_built(ImageFormat::Jxl));
+            }
+        }
     };
 
     match output_fmt {
@@ -252,6 +280,9 @@ pub fn convert_bytes_with_input(
                 Err(ImgOptimError::not_built(ImageFormat::Webp))
             }
         }
+        ImageFormat::Tiff | ImageFormat::Jxl => Err(ImgOptimError::UnsupportedFormat(
+            "TIFF/JXL output is not supported".into(),
+        )),
     }
 }
 

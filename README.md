@@ -22,6 +22,29 @@ cargo build --release
 
 Le binaire est disponible dans `target/release/imgoptim`.
 
+## Synchronisation Git (main/origin)
+
+Si votre clone ne possède pas encore `origin` ou `main`, utilisez le script
+suivant pour sécuriser la synchronisation de votre branche courante :
+
+```bash
+scripts/sync_with_main.sh
+```
+
+Comportement :
+
+- vérifie la présence d’un dépôt Git et d’une branche active,
+- vérifie la présence de `origin`,
+- crée `main` local s’il n’existe pas encore,
+- fait `fetch origin main`,
+- puis `rebase` la branche courante sur `origin/main`.
+
+Mode merge explicite :
+
+```bash
+scripts/sync_with_main.sh --merge
+```
+
 ## Utilisation rapide
 
 ### Optimiser des images (même format en sortie)

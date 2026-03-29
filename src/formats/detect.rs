@@ -27,6 +27,8 @@ fn read_head(path: &Path, n: usize) -> io::Result<Vec<u8>> {
 /// - JPEG: FF D8 FF
 /// - PNG:  89 50 4E 47 0D 0A 1A 0A
 /// - WebP: "RIFF" .... "WEBP"
+/// - TIFF: "II*\0" or "MM\0*"
+/// - JXL: container signature box or codestream signature
 pub fn detect_format(path: &Path) -> io::Result<Option<ImageFormat>> {
     let head = read_head(path, 64)?;
 
@@ -50,5 +52,57 @@ pub fn detect_format_from_bytes(head: &[u8]) -> Option<ImageFormat> {
         return Some(ImageFormat::Webp);
     }
 
+    // TIFF: II*\0 or MM\0*
+    if head.len() >= 4
+        && ((head[0..4] == [0x49, 0x49, 0x2a, 0x00]) || (head[0..4] == [0x4d, 0x4d, 0x00, 0x2a]))
+    {
+        return Some(ImageFormat::Tiff);
+    }
+
+    // JXL codestream signature: FF 0A
+    if head.len() >= 2 && head[0] == 0xff && head[1] == 0x0a {
+        return Some(ImageFormat::Jxl);
+    }
+
+    // JXL container signature box: 00 00 00 0C 4A 58 4C 20 0D 0A 87 0A
+    const JXL_CONTAINER_SIG: [u8; 12] = [
+        0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20, 0x0d, 0x0a, 0x87, 0x0a,
+    ];
+    if head.len() >= 12 && head[..12] == JXL_CONTAINER_SIG {
+        return Some(ImageFormat::Jxl);
+    }
+
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::detect_format_from_bytes;
+    use crate::formats::ImageFormat;
+
+    #[test]
+    fn detect_tiff_little_endian_magic() {
+        let bytes = [0x49, 0x49, 0x2a, 0x00, 0x08, 0x00];
+        assert_eq!(detect_format_from_bytes(&bytes), Some(ImageFormat::Tiff));
+    }
+
+    #[test]
+    fn detect_tiff_big_endian_magic() {
+        let bytes = [0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x08];
+        assert_eq!(detect_format_from_bytes(&bytes), Some(ImageFormat::Tiff));
+    }
+
+    #[test]
+    fn detect_jxl_codestream_magic() {
+        let bytes = [0xff, 0x0a, 0x00, 0x01];
+        assert_eq!(detect_format_from_bytes(&bytes), Some(ImageFormat::Jxl));
+    }
+
+    #[test]
+    fn detect_jxl_container_magic() {
+        let bytes = [
+            0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20, 0x0d, 0x0a, 0x87, 0x0a,
+        ];
+        assert_eq!(detect_format_from_bytes(&bytes), Some(ImageFormat::Jxl));
+    }
 }
