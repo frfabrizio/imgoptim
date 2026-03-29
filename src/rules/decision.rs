@@ -9,9 +9,7 @@ use crate::formats::{self, ImageFormat};
 use crate::rules::naming::make_output_path;
 use crate::rules::resize::parse_resize_spec;
 use crate::rules::threshold::{gain_percent, should_replace};
-use std::sync::Mutex;
-
-use once_cell::sync::Lazy;
+use std::sync::{LazyLock, Mutex};
 
 #[derive(Default)]
 struct Totals {
@@ -24,7 +22,7 @@ struct Totals {
     bytes_out: u64,
 }
 
-static TOTALS: Lazy<Mutex<Totals>> = Lazy::new(|| Mutex::new(Totals::default()));
+static TOTALS: LazyLock<Mutex<Totals>> = LazyLock::new(|| Mutex::new(Totals::default()));
 
 #[derive(Clone, Copy)]
 struct ImageInfo {
@@ -92,10 +90,10 @@ fn image_info_from_raw(raw: &RawImage, input_fmt: ImageFormat, input_bytes: &[u8
 }
 
 fn format_jpegoptim_summary(input: &Path, info: ImageInfo, stats: SummaryStats) -> String {
-    let name = input
-        .file_name()
-        .map(|n| n.to_string_lossy())
-        .unwrap_or_else(|| input.display().to_string().into());
+    let name = input.file_name().map_or_else(
+        || input.display().to_string().into(),
+        |n| n.to_string_lossy(),
+    );
     let mut details = format!(
         "{name} {}x{} {}bit",
         info.width, info.height, info.bit_depth
@@ -122,16 +120,13 @@ fn format_jpegoptim_summary(input: &Path, info: ImageInfo, stats: SummaryStats) 
 fn format_zopfli_status(opts: &Opts) -> String {
     let iteration = opts
         .zopfli_iteration_count
-        .map(|v| v.to_string())
-        .unwrap_or_else(|| "default".to_string());
+        .map_or_else(|| "default".to_string(), |v| v.to_string());
     let splits = opts
         .zopfli_max_block_splits
-        .map(|v| v.to_string())
-        .unwrap_or_else(|| "default".to_string());
+        .map_or_else(|| "default".to_string(), |v| v.to_string());
     let timeout = opts
         .zopfli_timeout_secs
-        .map(|v| format!("{v}s"))
-        .unwrap_or_else(|| "none".to_string());
+        .map_or_else(|| "none".to_string(), |v| format!("{v}s"));
     format!("Zopfli: iteration_count={iteration} max_block_splits={splits} timeout={timeout}")
 }
 
@@ -158,9 +153,7 @@ fn build_optimize_options(
         true
     } else {
         match (opts.mode, out_fmt) {
-            (Mode::Convert, ImageFormat::Webp) => {
-                opts.convert.as_ref().map(|c| !c.lossy).unwrap_or(true)
-            }
+            (Mode::Convert, ImageFormat::Webp) => opts.convert.as_ref().map_or(true, |c| !c.lossy),
             (Mode::Optimize, ImageFormat::Webp) => true,
             _ => false,
         }
@@ -170,6 +163,11 @@ fn build_optimize_options(
         quality: opts.quality,
         max_quality: opts.max_quality,
         progressive,
+        jpeg_sampling: opts.jpeg_sampling.map(|sampling| match sampling {
+            crate::cli::JpegSampling::S444 => crate::formats::convert::JpegSampling::S444,
+            crate::cli::JpegSampling::S422 => crate::formats::convert::JpegSampling::S422,
+            crate::cli::JpegSampling::S420 => crate::formats::convert::JpegSampling::S420,
+        }),
 
         // PNG
         png_level: opts.png_level,
@@ -256,8 +254,7 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
         let bg = opts
             .convert
             .as_ref()
-            .map(|c| c.background.as_str())
-            .unwrap_or("#ffffff");
+            .map_or("#ffffff", |c| c.background.as_str());
         let rgb = crate::rules::color::parse_hex_rgb(bg)?;
         Some([rgb.r, rgb.g, rgb.b])
     } else {
@@ -289,8 +286,7 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
             let fit = opts
                 .convert
                 .as_ref()
-                .map(|c| c.fit)
-                .unwrap_or(crate::cli::FitMode::Contain);
+                .map_or(crate::cli::FitMode::Contain, |c| c.fit);
             raw = apply_resize(raw, spec, fit);
         }
 
@@ -298,7 +294,7 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
             let input_size = std::fs::metadata(input)?.len();
             let target_bytes = match target {
                 TargetSize::KiloBytes(kb) => kb * 1024,
-                TargetSize::Percent(p) => (input_size * (p as u64)) / 100,
+                TargetSize::Percent(p) => (input_size * u64::from(p)) / 100,
             };
             let max_q = opts
                 .max_quality

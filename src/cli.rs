@@ -36,6 +36,7 @@ pub enum Mode {
 }
 
 impl Cmd {
+    #[must_use]
     pub fn into_mode_and_options(self) -> (Mode, Opts) {
         match self.sub {
             None => {
@@ -53,7 +54,7 @@ impl Cmd {
             Some(Sub::Convert(c)) => {
                 let mut o = Opts::from_common(self.common);
                 o.mode = Mode::Convert;
-                o.inputs = c.inputs.clone();
+                o.inputs.clone_from(&c.inputs);
                 o.convert = Some(ConvertOpts {
                     output: c.output,
                     input: c.input,
@@ -91,6 +92,16 @@ pub enum FitMode {
     Stretch,
 }
 
+#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JpegSampling {
+    #[value(name = "444")]
+    S444,
+    #[value(name = "422")]
+    S422,
+    #[value(name = "420")]
+    S420,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Verbosity {
     Quiet,
@@ -99,6 +110,7 @@ pub enum Verbosity {
 }
 
 impl Verbosity {
+    #[must_use]
     pub fn is_verbose(self) -> bool {
         matches!(self, Verbosity::Verbose)
     }
@@ -187,6 +199,7 @@ pub struct Opts {
     pub all_normal: bool,
     pub all_progressive: bool,
     pub jpeg_turbo: bool,
+    pub jpeg_sampling: Option<JpegSampling>,
 
     pub png_level: Option<u8>,
     pub zopfli: bool,
@@ -323,6 +336,10 @@ pub struct CommonOpts {
     #[arg(long = "jpeg-turbo")]
     pub jpeg_turbo: bool,
 
+    /// JPEG chroma subsampling: 444, 422 or 420.
+    #[arg(long = "jpeg-sampling", value_enum)]
+    pub jpeg_sampling: Option<JpegSampling>,
+
     /// PNG compression level 0..9 (default: 6).
     #[arg(long = "png-level")]
     pub png_level: Option<u8>,
@@ -364,7 +381,7 @@ pub struct CommonOpts {
     #[arg(long = "background")]
     pub convert_background: Option<String>,
 
-    /// Resize images (WxH, Wx, xH).
+    /// Resize images (`WxH`, `Wx`, `xH`).
     #[arg(long = "resize")]
     pub convert_resize: Option<String>,
 
@@ -390,7 +407,7 @@ pub struct ConvertCmd {
     #[arg(long = "background", default_value = "#ffffff")]
     pub background: String,
 
-    /// Resize images (WxH, Wx, xH).
+    /// Resize images (`WxH`, `Wx`, `xH`).
     #[arg(long = "resize")]
     pub resize: Option<String>,
 
@@ -414,6 +431,7 @@ impl Opts {
         }
     }
 
+    #[must_use]
     pub fn from_common(c: CommonOpts) -> Self {
         let verbosity = Self::verbosity_from_flags(c.quiet, c.verbose);
         let quality = c.quality;
@@ -455,6 +473,7 @@ impl Opts {
             all_normal: c.all_normal,
             all_progressive: c.all_progressive,
             jpeg_turbo: c.jpeg_turbo,
+            jpeg_sampling: c.jpeg_sampling,
 
             png_level: c.png_level,
             zopfli: c.zopfli,

@@ -25,6 +25,10 @@ fn help_works() {
         "help should mention --jpeg-progressive"
     );
     assert!(
+        stdout.contains("--jpeg-sampling"),
+        "help should mention --jpeg-sampling"
+    );
+    assert!(
         stdout.contains("--png-zopfli"),
         "help should mention --png-zopfli"
     );

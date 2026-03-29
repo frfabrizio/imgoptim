@@ -6,7 +6,7 @@ fn target_kb() {
     let t = TargetSize::KiloBytes(kb);
     match t {
         TargetSize::KiloBytes(k) => assert_eq!(k * 1024, 256_000),
-        _ => unreachable!(),
+        TargetSize::Percent(_) => unreachable!(),
     }
 }
 
@@ -15,7 +15,7 @@ fn target_percent_math() {
     let ref_bytes = 1_000_000u64;
     let p = TargetSize::Percent(85);
     match p {
-        TargetSize::Percent(pp) => assert_eq!((ref_bytes * (pp as u64)) / 100, 850_000),
-        _ => unreachable!(),
+        TargetSize::Percent(pp) => assert_eq!((ref_bytes * u64::from(pp)) / 100, 850_000),
+        TargetSize::KiloBytes(_) => unreachable!(),
     }
 }

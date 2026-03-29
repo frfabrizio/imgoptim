@@ -139,6 +139,7 @@ mod tests {
             all_normal: false,
             all_progressive: false,
             jpeg_turbo: false,
+            jpeg_sampling: None,
             png_level: None,
             zopfli: false,
             zopfli_iteration_count: None,

@@ -1,12 +1,13 @@
 use crate::error::ImgOptimError;
 
 /// Compute gain percentage: 100 * (old - new) / old
+#[must_use]
 pub fn gain_percent(old_bytes: u64, new_bytes: u64) -> f32 {
     if old_bytes == 0 {
         return 0.0;
     }
-    let diff = old_bytes.saturating_sub(new_bytes) as f32;
-    (diff * 100.0) / (old_bytes as f32)
+    let diff = old_bytes.saturating_sub(new_bytes) as f64;
+    ((diff * 100.0) / (old_bytes as f64)) as f32
 }
 
 /// Decide if we should replace target based on threshold and force.

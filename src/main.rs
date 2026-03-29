@@ -40,7 +40,7 @@ fn main() -> anyhow::Result<()> {
     let inputs = expand_inputs(&opts.inputs);
     let total = inputs.len();
     let mut processed = 0usize;
-    for input in inputs.iter() {
+    for input in &inputs {
         let input_path = input.as_path();
 
         match decision::process_one(input_path, &opts) {
@@ -198,6 +198,9 @@ fn format_selected_options(mode: imgoptim::cli::Mode, opts: &imgoptim::cli::Opts
     if opts.jpeg_turbo {
         out.push("--jpeg-turbo".to_string());
     }
+    if let Some(v) = opts.jpeg_sampling {
+        out.push(format!("--jpeg-sampling={}", jpeg_sampling_to_str(v)));
+    }
     if let Some(v) = opts.png_level {
         out.push(format!("--png-level={v}"));
     }
@@ -255,5 +258,13 @@ fn fit_to_str(fit: imgoptim::cli::FitMode) -> &'static str {
         imgoptim::cli::FitMode::Contain => "contain",
         imgoptim::cli::FitMode::Cover => "cover",
         imgoptim::cli::FitMode::Stretch => "stretch",
+    }
+}
+
+fn jpeg_sampling_to_str(sampling: imgoptim::cli::JpegSampling) -> &'static str {
+    match sampling {
+        imgoptim::cli::JpegSampling::S444 => "444",
+        imgoptim::cli::JpegSampling::S422 => "422",
+        imgoptim::cli::JpegSampling::S420 => "420",
     }
 }

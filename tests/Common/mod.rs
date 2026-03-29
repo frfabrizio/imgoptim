@@ -141,6 +141,54 @@ pub fn jpeg_extract_xmp(bytes: &[u8]) -> Option<Vec<u8>> {
 }
 
 #[allow(dead_code)]
+pub fn jpeg_luma_sampling(bytes: &[u8]) -> Option<(u8, u8)> {
+    if bytes.len() < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8 {
+        return None;
+    }
+
+    let mut i = 2usize;
+    while i + 4 <= bytes.len() {
+        if bytes[i] != 0xFF {
+            i += 1;
+            continue;
+        }
+        while i < bytes.len() && bytes[i] == 0xFF {
+            i += 1;
+        }
+        if i >= bytes.len() {
+            break;
+        }
+        let marker = bytes[i];
+        i += 1;
+
+        if marker == 0xD9 || marker == 0xDA {
+            break;
+        }
+        if i + 2 > bytes.len() {
+            break;
+        }
+        let seg_len = u16::from_be_bytes([bytes[i], bytes[i + 1]]) as usize;
+        i += 2;
+        if seg_len < 2 || i + (seg_len - 2) > bytes.len() {
+            break;
+        }
+
+        if (0xC0..=0xC2).contains(&marker) {
+            let payload = &bytes[i..i + (seg_len - 2)];
+            if payload.len() < 9 {
+                return None;
+            }
+            let factors = payload[7];
+            return Some((factors >> 4, factors & 0x0F));
+        }
+
+        i += seg_len - 2;
+    }
+
+    None
+}
+
+#[allow(dead_code)]
 fn jpeg_extract_app1_payload(bytes: &[u8], prefix: &[u8]) -> Option<Vec<u8>> {
     if bytes.len() < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8 {
         return None;
@@ -203,9 +251,8 @@ pub fn webp_contains_xmp(bytes: &[u8]) -> bool {
         let size = u32::from_le_bytes(size_bytes) as usize;
 
         let payload_start = i + 8;
-        let payload_end = match payload_start.checked_add(size) {
-            Some(v) => v,
-            None => return false,
+        let Some(payload_end) = payload_start.checked_add(size) else {
+            return false;
         };
         if payload_end > bytes.len() {
             return false;

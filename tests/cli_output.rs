@@ -173,11 +173,7 @@ fn overwrite_gain_uses_input_size() {
     let new_bytes = fs::metadata(&out).expect("output metadata").len();
     assert_ne!(old_bytes, new_bytes, "expected size change for gain test");
 
-    let expected = if old_bytes == 0 {
-        0.0
-    } else {
-        ((old_bytes.saturating_sub(new_bytes)) as f32) * 100.0 / (old_bytes as f32)
-    };
+    let expected = imgoptim::rules::threshold::gain_percent(old_bytes, new_bytes);
     let expected_str = format!("{expected:.2}");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -219,6 +215,51 @@ fn quiet_mode_prints_progress() {
 }
 
 #[test]
+fn jpeg_sampling_option_changes_output_sampling() {
+    let out_dir = tmp_out_dir();
+    let input = asset_path("tests/assets/png/image_nometa.png");
+    assert!(input.exists(), "missing asset: {}", input.display());
+
+    run_ok(&[
+        "--output-format",
+        "jpeg",
+        "--background",
+        "#ffffff",
+        "--jpeg-sampling",
+        "444",
+        "--name-suffix",
+        "_444",
+        "--overwrite",
+        "--dest",
+        out_dir.path().to_str().unwrap(),
+        input.to_str().unwrap(),
+    ]);
+
+    run_ok(&[
+        "--output-format",
+        "jpeg",
+        "--background",
+        "#ffffff",
+        "--jpeg-sampling",
+        "420",
+        "--name-suffix",
+        "_420",
+        "--overwrite",
+        "--dest",
+        out_dir.path().to_str().unwrap(),
+        input.to_str().unwrap(),
+    ]);
+
+    let out_444 = expect_jpeg_out(out_dir.path(), "image_nometa_444");
+    let out_420 = expect_jpeg_out(out_dir.path(), "image_nometa_420");
+
+    let bytes_444 = read_bytes(&out_444);
+    let bytes_420 = read_bytes(&out_420);
+    assert_eq!(jpeg_luma_sampling(&bytes_444), Some((1, 1)));
+    assert_eq!(jpeg_luma_sampling(&bytes_420), Some((2, 2)));
+}
+
+#[test]
 fn verbose_prints_options_and_summary() {
     let out_dir = tmp_out_dir();
     let input = asset_path("tests/assets/jpeg/photo_nometa.jpg");
@@ -230,6 +271,8 @@ fn verbose_prints_options_and_summary() {
             "-v",
             "-m",
             "65",
+            "--jpeg-sampling",
+            "444",
             "--overwrite",
             "--keep-metadata",
             "--dest",
@@ -253,7 +296,8 @@ fn verbose_prints_options_and_summary() {
         "stdout should show quality limit: {stdout}"
     );
     assert!(
-        stdout.contains("Options: --overwrite --keep-metadata"),
+        stdout.contains("Options: --overwrite --keep-metadata --jpeg-sampling=444")
+            || stdout.contains("Options: --overwrite --jpeg-sampling=444 --keep-metadata"),
         "stdout should show selected options: {stdout}"
     );
     assert!(

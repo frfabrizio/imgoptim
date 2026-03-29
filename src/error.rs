@@ -18,9 +18,11 @@ pub enum ImgOptimError {
 }
 
 impl ImgOptimError {
+    #[must_use]
     pub fn not_built(detected: formats::ImageFormat) -> Self {
         Self::NotBuilt { detected }
     }
+    #[must_use]
     pub fn processing(msg: impl Into<String>) -> Self {
         Self::Processing(msg.into())
     }
@@ -29,17 +31,16 @@ impl ImgOptimError {
 impl fmt::Display for ImgOptimError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Io(err) => write!(f, "I/O error: {}", err),
+            Self::Io(err) => write!(f, "I/O error: {err}"),
             Self::Processing(msg) => write!(f, "Processing error: {msg}"),
             Self::UnknownFormat => write!(f, "Unknown format (could not detect input format)"),
-            Self::UnsupportedFormat(fmt) => write!(f, "Unsupported format: {}", fmt),
-            Self::InvalidArgs(msg) => write!(f, "Invalid arguments: {}", msg),
-            Self::InvalidOption(msg) => write!(f, "Invalid option: {}", msg),
-            Self::Metadata(msg) => write!(f, "Metadata error: {}", msg),
+            Self::UnsupportedFormat(fmt) => write!(f, "Unsupported format: {fmt}"),
+            Self::InvalidArgs(msg) => write!(f, "Invalid arguments: {msg}"),
+            Self::InvalidOption(msg) => write!(f, "Invalid option: {msg}"),
+            Self::Metadata(msg) => write!(f, "Metadata error: {msg}"),
             Self::NotBuilt { detected } => write!(
                 f,
-                "Support not built for detected format/feature: {}",
-                detected
+                "Support not built for detected format/feature: {detected}"
             ),
         }
     }

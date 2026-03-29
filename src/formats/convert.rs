@@ -27,6 +27,13 @@ pub(crate) struct RawImage {
     pub pixels: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JpegSampling {
+    S444,
+    S422,
+    S420,
+}
+
 /// Shared options for all codecs (no clap types here).
 #[derive(Debug, Clone, Default)]
 pub struct OptimizeOptions {
@@ -36,6 +43,7 @@ pub struct OptimizeOptions {
 
     // JPEG
     pub progressive: bool,
+    pub jpeg_sampling: Option<JpegSampling>,
 
     // PNG
     pub png_level: Option<u8>,
@@ -78,9 +86,14 @@ impl OptimizeOptions {
                 }
             }
             ImageFormat::Png => {
-                if self.quality.is_some() || self.max_quality.is_some() || self.progressive {
+                if self.quality.is_some()
+                    || self.max_quality.is_some()
+                    || self.progressive
+                    || self.jpeg_sampling.is_some()
+                {
                     return Err(ImgOptimError::InvalidArgs(
-                        "quality/max_quality/progressive are not applicable to PNG".into(),
+                        "quality/max_quality/progressive/jpeg_sampling are not applicable to PNG"
+                            .into(),
                     ));
                 }
                 if self.webp_lossless || self.webp_method.is_some() {
@@ -90,9 +103,9 @@ impl OptimizeOptions {
                 }
             }
             ImageFormat::Webp => {
-                if self.progressive {
+                if self.progressive || self.jpeg_sampling.is_some() {
                     return Err(ImgOptimError::InvalidArgs(
-                        "progressive is not applicable to WebP".into(),
+                        "progressive/jpeg_sampling are not applicable to WebP".into(),
                     ));
                 }
                 if self.png_level.is_some() || self.zopfli_requested() {

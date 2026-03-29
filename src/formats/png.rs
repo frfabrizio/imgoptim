@@ -351,6 +351,7 @@ mod tests {
             quality: None,
             max_quality: None,
             progressive: false,
+            jpeg_sampling: None,
             png_level: Some(6),
             zopfli: true,
             zopfli_iteration_count: Some(1),

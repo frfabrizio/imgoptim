@@ -99,7 +99,7 @@ fn preserve_copies_timestamps() {
     let input = out_dir.path().join("image_nometa.png");
     fs::copy(&input_src, &input).expect("copy test asset");
 
-    let ts = FileTime::from_unix_time(946684800, 0);
+    let ts = FileTime::from_unix_time(946_684_800, 0);
     set_file_mtime(&input, ts).expect("set mtime");
 
     run_ok(&[
