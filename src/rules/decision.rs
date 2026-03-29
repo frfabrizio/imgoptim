@@ -43,17 +43,20 @@ struct SummaryStats {
 }
 
 /// Map internal ImageFormat -> CLI enum (for --only/--skip filtering)
-fn fmt_to_cli(fmt: ImageFormat) -> Fmt {
+fn fmt_to_cli(fmt: ImageFormat) -> Option<Fmt> {
     match fmt {
-        ImageFormat::Jpeg => Fmt::Jpeg,
-        ImageFormat::Png => Fmt::Png,
-        ImageFormat::Webp => Fmt::Webp,
+        ImageFormat::Jpeg => Some(Fmt::Jpeg),
+        ImageFormat::Png => Some(Fmt::Png),
+        ImageFormat::Webp => Some(Fmt::Webp),
+        ImageFormat::Tiff | ImageFormat::Jxl => None,
     }
 }
 
 /// Apply --only / --skip filtering after detection.
 fn passes_only_skip(fmt: ImageFormat, opts: &Opts) -> bool {
-    let f = fmt_to_cli(fmt);
+    let Some(f) = fmt_to_cli(fmt) else {
+        return opts.only.is_empty();
+    };
     if !opts.only.is_empty() && !opts.only.contains(&f) {
         return false;
     }
@@ -188,7 +191,7 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
     let detected = formats::detect::detect_format(input)?.ok_or(ImgOptimError::UnknownFormat)?;
 
     // 2) Policy A: must be built into the binary
-    if !formats::is_built(detected) {
+    if opts.mode == Mode::Optimize && !formats::is_built(detected) {
         return Err(ImgOptimError::not_built(detected));
     }
 
@@ -205,7 +208,7 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
     if opts.mode == Mode::Convert {
         if let Some(cv) = &opts.convert {
             if let Some(expected) = cv.input {
-                if expected != fmt_to_cli(detected) {
+                if Some(expected) != fmt_to_cli(detected) {
                     return Ok(format!(
                         "{}: skipped by convert --input (detected {})",
                         input.display(),
@@ -558,6 +561,28 @@ fn decode_raw(input: &[u8], fmt: ImageFormat) -> Result<RawImage, ImgOptimError>
                 Err(ImgOptimError::not_built(ImageFormat::Webp))
             }
         }
+        ImageFormat::Tiff | ImageFormat::Jxl => decode_with_image_crate(input, fmt),
+    }
+}
+
+fn decode_with_image_crate(_input: &[u8], fmt: ImageFormat) -> Result<RawImage, ImgOptimError> {
+    #[cfg(feature = "webp")]
+    {
+        let dyn_img = image::load_from_memory(_input)
+            .map_err(|e| ImgOptimError::Processing(format!("{fmt} decode failed: {e}")))?;
+        let rgba = dyn_img.to_rgba8();
+        return Ok(RawImage {
+            width: rgba.width(),
+            height: rgba.height(),
+            color: RawColor::Rgba8,
+            pixels: rgba.into_raw(),
+        });
+    }
+    #[cfg(not(feature = "webp"))]
+    {
+        Err(ImgOptimError::InvalidArgs(format!(
+            "{fmt} input decoding requires the `webp` feature (image decoder backend)"
+        )))
     }
 }
 
@@ -598,6 +623,9 @@ fn encode_from_raw(
                 Err(ImgOptimError::not_built(ImageFormat::Webp))
             }
         }
+        ImageFormat::Tiff | ImageFormat::Jxl => Err(ImgOptimError::InvalidArgs(
+            "TIFF/JXL cannot be used as output formats".into(),
+        )),
     }
 }
 

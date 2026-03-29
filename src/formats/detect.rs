@@ -29,6 +29,8 @@ fn read_head(path: &Path, n: usize) -> io::Result<Vec<u8>> {
 /// - JPEG: FF D8 FF
 /// - PNG:  89 50 4E 47 0D 0A 1A 0A
 /// - WebP: "RIFF" .... "WEBP"
+/// - TIFF: "II*\0", "MM\0*", plus BigTIFF variants
+/// - JXL: codestream "FF 0A" or container signature "JXL "
 ///
 /// # Errors
 ///
@@ -56,5 +58,45 @@ pub fn detect_format_from_bytes(head: &[u8]) -> Option<ImageFormat> {
         return Some(ImageFormat::Webp);
     }
 
+    // TIFF classic + BigTIFF
+    if head.len() >= 4
+        && ((head[0] == b'I' && head[1] == b'I' && (head[2], head[3]) == (0x2a, 0x00))
+            || (head[0] == b'M' && head[1] == b'M' && (head[2], head[3]) == (0x00, 0x2a))
+            || (head[0] == b'I' && head[1] == b'I' && (head[2], head[3]) == (0x2b, 0x00))
+            || (head[0] == b'M' && head[1] == b'M' && (head[2], head[3]) == (0x00, 0x2b)))
+    {
+        return Some(ImageFormat::Tiff);
+    }
+
+    // JPEG XL codestream (FF 0A)
+    if head.len() >= 2 && head[0] == 0xff && head[1] == 0x0a {
+        return Some(ImageFormat::Jxl);
+    }
+    // JPEG XL container signature: 00 00 00 0C 'J' 'X' 'L' ' ' 0D 0A 87 0A
+    if head.len() >= 12
+        && head[0..4] == [0x00, 0x00, 0x00, 0x0c]
+        && &head[4..8] == b"JXL "
+        && head[8..12] == [0x0d, 0x0a, 0x87, 0x0a]
+    {
+        return Some(ImageFormat::Jxl);
+    }
+
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_tiff_little_endian() {
+        let bytes = [b'I', b'I', 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00];
+        assert_eq!(detect_format_from_bytes(&bytes), Some(ImageFormat::Tiff));
+    }
+
+    #[test]
+    fn detects_jxl_codestream() {
+        let bytes = [0xff, 0x0a, 0x00, 0x11];
+        assert_eq!(detect_format_from_bytes(&bytes), Some(ImageFormat::Jxl));
+    }
 }

@@ -47,6 +47,7 @@ pub fn apply_tag_category(
         ImageFormat::Jpeg => replace_xmp_in_jpeg(input, category),
         ImageFormat::Png => replace_xmp_in_png(input, category),
         ImageFormat::Webp => inject_xmp_in_webp(input, category),
+        ImageFormat::Tiff | ImageFormat::Jxl => Ok(input.to_vec()),
     }
 }
 
@@ -59,6 +60,7 @@ pub fn has_exif(fmt: ImageFormat, input: &[u8]) -> bool {
             .and_then(|meta| meta.exif)
             .is_some(),
         ImageFormat::Webp => false,
+        ImageFormat::Tiff | ImageFormat::Jxl => false,
     }
 }
 

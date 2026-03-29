@@ -119,6 +119,11 @@ impl OptimizeOptions {
                     ));
                 }
             }
+            ImageFormat::Tiff | ImageFormat::Jxl => {
+                return Err(ImgOptimError::InvalidArgs(
+                    "TIFF/JXL are supported as input in convert mode only".into(),
+                ));
+            }
         }
         Ok(())
     }
@@ -196,6 +201,9 @@ pub fn convert_bytes(
                 Err(ImgOptimError::not_built(ImageFormat::Webp))
             }
         }
+        ImageFormat::Tiff | ImageFormat::Jxl => Err(ImgOptimError::InvalidArgs(
+            "TIFF/JXL are supported as input in convert mode only".into(),
+        )),
     }
 }
 
@@ -248,6 +256,27 @@ pub fn convert_bytes_with_input(
                 return Err(ImgOptimError::not_built(ImageFormat::Webp));
             }
         }
+        ImageFormat::Tiff | ImageFormat::Jxl => {
+            #[cfg(feature = "webp")]
+            {
+                let dyn_img = image::load_from_memory(input).map_err(|e| {
+                    ImgOptimError::Processing(format!("{input_fmt} decode failed: {e}"))
+                })?;
+                let rgba = dyn_img.to_rgba8();
+                RawImage {
+                    width: rgba.width(),
+                    height: rgba.height(),
+                    color: RawColor::Rgba8,
+                    pixels: rgba.into_raw(),
+                }
+            }
+            #[cfg(not(feature = "webp"))]
+            {
+                return Err(ImgOptimError::InvalidArgs(
+                    "TIFF/JXL input decoding requires the `webp` feature (image backend)".into(),
+                ));
+            }
+        }
     };
 
     match output_fmt {
@@ -281,6 +310,9 @@ pub fn convert_bytes_with_input(
                 Err(ImgOptimError::not_built(ImageFormat::Webp))
             }
         }
+        ImageFormat::Tiff | ImageFormat::Jxl => Err(ImgOptimError::InvalidArgs(
+            "TIFF/JXL cannot be used as output formats".into(),
+        )),
     }
 }
 

@@ -40,6 +40,8 @@ pub enum ImageFormat {
     Jpeg,
     Png,
     Webp,
+    Tiff,
+    Jxl,
 }
 
 impl ImageFormat {
@@ -49,6 +51,8 @@ impl ImageFormat {
             ImageFormat::Jpeg => "jpeg",
             ImageFormat::Png => "png",
             ImageFormat::Webp => "webp",
+            ImageFormat::Tiff => "tiff",
+            ImageFormat::Jxl => "jxl",
         }
     }
 
@@ -58,6 +62,8 @@ impl ImageFormat {
             ImageFormat::Jpeg => &["jpg", "jpeg", "jpe"],
             ImageFormat::Png => &["png"],
             ImageFormat::Webp => &["webp"],
+            ImageFormat::Tiff => &["tif", "tiff"],
+            ImageFormat::Jxl => &["jxl"],
         }
     }
 
@@ -70,6 +76,8 @@ impl ImageFormat {
             "jpg" | "jpeg" | "jpe" => Some(ImageFormat::Jpeg),
             "png" => Some(ImageFormat::Png),
             "webp" => Some(ImageFormat::Webp),
+            "tif" | "tiff" => Some(ImageFormat::Tiff),
+            "jxl" => Some(ImageFormat::Jxl),
             _ => None,
         }
     }
@@ -88,6 +96,8 @@ impl ImageFormat {
             "image/jpeg" | "image/jpg" => Some(ImageFormat::Jpeg),
             "image/png" => Some(ImageFormat::Png),
             "image/webp" => Some(ImageFormat::Webp),
+            "image/tiff" | "image/tif" => Some(ImageFormat::Tiff),
+            "image/jxl" | "image/jxlp" | "image/jpegxl" => Some(ImageFormat::Jxl),
             _ => None,
         }
     }
@@ -110,5 +120,6 @@ pub fn is_built(fmt: ImageFormat) -> bool {
         ImageFormat::Jpeg => cfg!(feature = "jpeg"),
         ImageFormat::Png => cfg!(feature = "png"),
         ImageFormat::Webp => cfg!(feature = "webp"),
+        ImageFormat::Tiff | ImageFormat::Jxl => false,
     }
 }
