@@ -7,7 +7,7 @@
 //!
 //! Supported options from `OptimizeOptions`:
 //! - `png_level` (0..9) -> mapped to `png::Compression`
-//! - `zopfli` -> currently returns an explicit Unsupported error unless you plug an optimizer
+//! - `zopfli` -> runs an oxipng zopfli pass after encoding
 //!
 //! Notes:
 //! - This implementation round-trips pixels (decode -> encode). It is safe but may not keep
@@ -19,6 +19,12 @@ use crate::formats::convert::{ImageCodec, OptimizeOptions, RawColor, RawImage};
 use crate::formats::ImageFormat;
 
 use png::{BitDepth, ColorType, Decoder, Encoder, Transformations};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::time::{Duration, Instant};
+use std::{io::Write, thread};
 
 pub struct Codec;
 
@@ -28,18 +34,10 @@ impl ImageCodec for Codec {
     fn optimize(input: &[u8], opts: &OptimizeOptions) -> ResultError<Vec<u8>> {
         validate_png_options(opts)?;
 
-        // If zopfli is requested, be explicit.
-        // You can later replace this branch with an oxipng-based path.
-        if opts.zopfli {
-            return Err(ImgOptimError::Processing(
-                "PNG zopfli requested, but no zopfli backend is wired yet (e.g. oxipng).".into(),
-            ));
-        }
-
         // 1) Decode PNG into a normalized buffer (RGB/RGBA, 8-bit)
         let decoded = decode_png_normalized(input)?;
 
-        // 2) Encode back with chosen compression level
+        // 2) Encode back with chosen compression level (+ optional zopfli pass)
         let mut out = encode_png_normalized(&decoded, opts)?;
 
         // 3) Optional metadata preservation hooks (no-op by default)
@@ -243,7 +241,131 @@ fn encode_png_normalized(img: &PngImage, opts: &OptimizeOptions) -> ResultError<
             .map_err(|e| ImgOptimError::Processing(format!("png write_image_data failed: {e}")))?;
     }
 
-    Ok(out)
+    apply_zopfli_if_needed(out, opts)
+}
+
+fn apply_zopfli_if_needed(bytes: Vec<u8>, opts: &OptimizeOptions) -> ResultError<Vec<u8>> {
+    if !opts.zopfli
+        && opts.zopfli_iteration_count.is_none()
+        && opts.zopfli_max_block_splits.is_none()
+        && opts.zopfli_timeout_secs.is_none()
+    {
+        return Ok(bytes);
+    }
+
+    let show_progress = opts.zopfli_progress;
+    let mut oxi_opts = if let Some(level) = opts.png_level {
+        oxipng::Options::from_preset(level.min(6))
+    } else {
+        oxipng::Options::default()
+    };
+    oxi_opts.strip = oxipng::StripChunks::None;
+    let mut zopts = oxipng::ZopfliOptions::default();
+    if let Some(iter) = opts.zopfli_iteration_count {
+        zopts.iteration_count = std::num::NonZeroU64::new(iter).ok_or_else(|| {
+            ImgOptimError::InvalidArgs("zopfli iteration_count must be >= 1".into())
+        })?;
+    }
+    if let Some(splits) = opts.zopfli_max_block_splits {
+        zopts.maximum_block_splits = splits;
+    }
+    oxi_opts.deflater = oxipng::Deflater::Zopfli(zopts);
+    if let Some(secs) = opts.zopfli_timeout_secs {
+        oxi_opts.timeout = Some(Duration::from_secs(secs));
+    }
+
+    let start = if show_progress {
+        Some(Instant::now())
+    } else {
+        None
+    };
+
+    let stop = Arc::new(AtomicBool::new(false));
+    let timeout_handle = if show_progress {
+        if let Some(secs) = opts.zopfli_timeout_secs {
+            let stop_flag = Arc::clone(&stop);
+            Some(thread::spawn(move || {
+                for remaining in (1..=secs).rev() {
+                    if stop_flag.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    print!("\rZopfli timeout: {remaining}s");
+                    let _ = std::io::stdout().flush();
+                    thread::sleep(Duration::from_secs(1));
+                }
+            }))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    if show_progress {
+        println!("Zopfli: start");
+    }
+
+    let result = oxipng::optimize_from_memory(&bytes, &oxi_opts)
+        .map_err(|e| ImgOptimError::Processing(format!("oxipng failed: {e}")));
+
+    stop.store(true, Ordering::Relaxed);
+    if let Some(handle) = timeout_handle {
+        let _ = handle.join();
+        println!();
+    }
+
+    if let Some(start) = start {
+        let elapsed = start.elapsed().as_secs_f32();
+        if result.is_ok() {
+            println!("Zopfli: done in {elapsed:.1}s");
+        } else {
+            println!("Zopfli: failed after {elapsed:.1}s");
+        }
+    }
+
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tiny_png_bytes() -> Vec<u8> {
+        let mut out = Vec::new();
+        {
+            let mut enc = Encoder::new(&mut out, 1, 1);
+            enc.set_color(ColorType::Rgb);
+            enc.set_depth(BitDepth::Eight);
+            let mut writer = enc.write_header().expect("png write_header");
+            writer
+                .write_image_data(&[0u8, 0u8, 0u8])
+                .expect("png write_image_data");
+        }
+        out
+    }
+
+    #[test]
+    fn zopfli_optimize_from_memory_works() {
+        let bytes = tiny_png_bytes();
+        let opts = OptimizeOptions {
+            quality: None,
+            max_quality: None,
+            progressive: false,
+            jpeg_sampling: None,
+            png_level: Some(6),
+            zopfli: true,
+            zopfli_iteration_count: Some(1),
+            zopfli_max_block_splits: Some(1),
+            zopfli_timeout_secs: Some(1),
+            zopfli_progress: false,
+            webp_lossless: false,
+            webp_method: None,
+        };
+
+        let out = apply_zopfli_if_needed(bytes, &opts).expect("zopfli optimize");
+        assert!(out.starts_with(b"\x89PNG\r\n\x1a\n"), "output is not PNG");
+        assert!(!out.is_empty(), "output should not be empty");
+    }
 }
 
 fn map_png_level_to_compression(level: Option<u8>) -> png::Compression {

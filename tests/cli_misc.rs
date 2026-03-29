@@ -32,8 +32,7 @@ fn convert_background_affects_output_bytes() {
         "--overwrite",
         "--dest",
         out_dir.path().to_str().unwrap(),
-        "convert",
-        "--output",
+        "--output-format",
         "jpeg",
         "--background",
         "#ffffff",
@@ -46,8 +45,7 @@ fn convert_background_affects_output_bytes() {
         "--overwrite",
         "--dest",
         out_dir.path().to_str().unwrap(),
-        "convert",
-        "--output",
+        "--output-format",
         "jpeg",
         "--background",
         "#000000",
@@ -101,7 +99,7 @@ fn preserve_copies_timestamps() {
     let input = out_dir.path().join("image_nometa.png");
     fs::copy(&input_src, &input).expect("copy test asset");
 
-    let ts = FileTime::from_unix_time(946684800, 0);
+    let ts = FileTime::from_unix_time(946_684_800, 0);
     set_file_mtime(&input, ts).expect("set mtime");
 
     run_ok(&[
@@ -159,4 +157,62 @@ fn threshold_prevents_write_but_force_overrides() {
 
     let out_force = out_dir.path().join("image_nometa_thr_force.png");
     expect_file_exists(&out_force);
+}
+
+#[test]
+fn dest_path_with_extension_is_treated_as_directory_yes_creates() {
+    let out_dir = tmp_out_dir();
+    let input = asset_path("tests/assets/jpeg/photo_nometa.jpg");
+    assert!(input.exists(), "missing asset: {}", input.display());
+
+    let dest = out_dir
+        .path()
+        .join("Mont Blanc")
+        .join("Optim")
+        .join("test.jpg");
+
+    run_ok_with_input(
+        &[
+            "-m65",
+            "--overwrite",
+            "--dest",
+            dest.to_str().unwrap(),
+            input.to_str().unwrap(),
+        ],
+        "o\n",
+    );
+
+    let out = expect_jpeg_out(&dest, "photo_nometa");
+    let bytes = read_bytes(&out);
+    assert_is_jpeg(&bytes);
+}
+
+#[test]
+fn dest_path_with_extension_is_treated_as_directory_no_aborts() {
+    let out_dir = tmp_out_dir();
+    let input = asset_path("tests/assets/jpeg/photo_nometa.jpg");
+    assert!(input.exists(), "missing asset: {}", input.display());
+
+    let dest = out_dir
+        .path()
+        .join("Mont Blanc")
+        .join("Optim")
+        .join("test_no.jpg");
+
+    let mut cmd = imgoptim_cmd();
+    cmd.args([
+        "-m65",
+        "--overwrite",
+        "--dest",
+        dest.to_str().unwrap(),
+        input.to_str().unwrap(),
+    ])
+    .write_stdin("n\n")
+    .assert()
+    .failure();
+
+    assert!(
+        !dest.exists(),
+        "destination directory should not be created"
+    );
 }

@@ -7,7 +7,7 @@ pour optimiser, convertir et uniformiser des lots d’images.
 ## Fonctionnalités
 
 - Optimisation JPEG/PNG/WebP avec modes lossless/lossy selon les options.
-- Conversion entre formats via la sous-commande `convert`.
+- Conversion entre formats via `--output-format`.
 - Contrôle fin de la qualité, de la taille cible et des métadonnées.
 - Politique de nommage flexible (suffixe, in-place, destination dédiée).
 - Mode dry-run, seuil minimal de gain et statistiques finales.
@@ -33,7 +33,7 @@ imgoptim --name-suffix "_imgoptim" photos/*.jpg
 ### Convertir vers un autre format
 
 ```bash
-imgoptim convert --output webp --name-suffix "_imgoptim" images/*.png
+imgoptim --output-format webp --name-suffix "_imgoptim" images/*.png
 ```
 
 ### Ajouter un tag et nettoyer les métadonnées
@@ -54,6 +54,7 @@ imgoptim --tag-category "Optimisé" --strip-exif photos/*.jpg
 - `--size <size>` : taille cible en KB ou % (active le mode lossy).
 - `--totals` : résumé global après traitement.
 - `--quiet` / `--verbose` : niveau de logs.
+- `--output-format <fmt>` : conversion sans sous-commande (jpeg/png/webp).
 
 ### Nommage
 
@@ -78,13 +79,13 @@ imgoptim --tag-category "Optimisé" --strip-exif photos/*.jpg
 - `--max <quality>` : qualité max JPEG (lossy).
 - `--quality <q>` : qualité générique (mapping par format).
 - `--jpeg-turbo` : privilégier libjpeg-turbo si dispo.
-- `--png-level <n>` / `--zopfli`
+- `--png-level <n>` / `--png-zopfli`
 - `--webp-lossless` : force l’encodage lossless WebP.
 
 ### Conversion
 
 ```bash
-imgoptim convert --output <fmt> [options] <files...>
+imgoptim --output-format <fmt> [options] <files...>
 ```
 
 Options spécifiques :
@@ -106,5 +107,5 @@ imgoptim --only png assets/*.*
 imgoptim --threshold 5 photos/*.jpg
 
 # Convertir en JPEG en redimensionnant
-imgoptim convert --output jpeg --resize 1200x --fit contain images/*.png
+imgoptim --output-format jpeg --resize 1200x --fit contain images/*.png
 ```

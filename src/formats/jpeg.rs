@@ -10,6 +10,7 @@ use crate::formats::convert::{ImageCodec, OptimizeOptions, RawColor, RawImage};
 use crate::formats::ImageFormat;
 
 use jpeg_encoder as je;
+use jpeg_encoder::SamplingFactor;
 use zune_core::bytestream::ZCursor;
 use zune_core::colorspace::ColorSpace;
 use zune_core::options::DecoderOptions;
@@ -180,16 +181,14 @@ fn encode_jpeg(img: &DecodedJpeg, opts: &OptimizeOptions) -> ResultError<Vec<u8>
         .unwrap_or(75)
         .clamp(1, 100);
 
-    // Progressive: wire it here if you want it enabled.
-    // For now: explicit error rather than silently ignoring.
-    if opts.progressive {
-        return Err(ImgOptimError::InvalidArgs(
-            "JPEG progressive requested but not enabled in this backend yet.".into(),
-        ));
-    }
-
     let mut out = Vec::with_capacity(img.pixels.len() / 2);
-    let enc = je::Encoder::new(&mut out, q);
+    let mut enc = je::Encoder::new(&mut out, q);
+    if opts.progressive {
+        enc.set_progressive(true);
+    }
+    if let Some(sampling) = opts.jpeg_sampling {
+        enc.set_sampling_factor(map_sampling_factor(sampling));
+    }
 
     let color = match img.color {
         JpegColor::L8 => je::ColorType::Luma,
@@ -200,4 +199,12 @@ fn encode_jpeg(img: &DecodedJpeg, opts: &OptimizeOptions) -> ResultError<Vec<u8>
         .map_err(|e| ImgOptimError::Processing(format!("JPEG encode failed: {e}")))?;
 
     Ok(out)
+}
+
+fn map_sampling_factor(sampling: crate::formats::convert::JpegSampling) -> SamplingFactor {
+    match sampling {
+        crate::formats::convert::JpegSampling::S444 => SamplingFactor::R_4_4_4,
+        crate::formats::convert::JpegSampling::S422 => SamplingFactor::R_4_2_2,
+        crate::formats::convert::JpegSampling::S420 => SamplingFactor::R_4_2_0,
+    }
 }

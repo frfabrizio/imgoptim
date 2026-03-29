@@ -4,7 +4,7 @@ fn make_png_chunk(ctype: [u8; 4], data: &[u8]) -> Vec<u8> {
     use crc32fast::Hasher;
 
     let mut out = Vec::with_capacity(12 + data.len());
-    out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+    out.extend_from_slice(&u32::try_from(data.len()).unwrap().to_be_bytes());
     out.extend_from_slice(&ctype);
     out.extend_from_slice(data);
 
@@ -16,7 +16,7 @@ fn make_png_chunk(ctype: [u8; 4], data: &[u8]) -> Vec<u8> {
     out
 }
 
-fn count_chunks(png: &[u8], want: &[u8; 4]) -> usize {
+fn count_chunks(png: &[u8], want: [u8; 4]) -> usize {
     if png.len() < 8 {
         return 0;
     }
@@ -25,7 +25,7 @@ fn count_chunks(png: &[u8], want: &[u8; 4]) -> usize {
     while pos + 12 <= png.len() {
         let len = u32::from_be_bytes(png[pos..pos + 4].try_into().unwrap()) as usize;
         let ctype: [u8; 4] = png[pos + 4..pos + 8].try_into().unwrap();
-        if &ctype == want {
+        if ctype == want {
             n += 1;
         }
         pos += 12 + len;
@@ -84,9 +84,9 @@ fn inject_png_meta_dedupes_exif_icc_xmp() {
     )
     .unwrap();
 
-    assert_eq!(count_chunks(&out, b"eXIf"), 1);
-    assert_eq!(count_chunks(&out, b"iCCP"), 1);
-    assert_eq!(count_chunks(&out, b"iTXt"), 1);
+    assert_eq!(count_chunks(&out, *b"eXIf"), 1);
+    assert_eq!(count_chunks(&out, *b"iCCP"), 1);
+    assert_eq!(count_chunks(&out, *b"iTXt"), 1);
 
     // Inject again: should remain one each
     let out2 = inject_png_meta(
@@ -97,7 +97,7 @@ fn inject_png_meta_dedupes_exif_icc_xmp() {
     )
     .unwrap();
 
-    assert_eq!(count_chunks(&out2, b"eXIf"), 1);
-    assert_eq!(count_chunks(&out2, b"iCCP"), 1);
-    assert_eq!(count_chunks(&out2, b"iTXt"), 1);
+    assert_eq!(count_chunks(&out2, *b"eXIf"), 1);
+    assert_eq!(count_chunks(&out2, *b"iCCP"), 1);
+    assert_eq!(count_chunks(&out2, *b"iTXt"), 1);
 }
