@@ -4,10 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["png", "jpeg"]
+default = ["png", "jpeg", "tiff", "jxl"]
 png = ["dep:oxipng", "dep:png"]
 jpeg = ["dep:jpeg-encoder", "dep:zune-jpeg", "dep:zune-core"]
-webp = ["dep:image"]
+webp = ["dep:image", "image/webp"]
+tiff = ["dep:image", "image/tiff"]
+jxl = ["dep:jxl-oxide"]
 
 [dependencies]
 anyhow = "1"
@@ -28,7 +30,8 @@ crc32fast = "1"
 flate2 = { version = "1", default-features = false, features = [
     "rust_backend",
 ] }
-image = { version = "0.25", default-features = false, features = ["webp"], optional = true }
+image = { version = "0.25", default-features = false, optional = true }
+jxl-oxide = { version = "0.9", optional = true }
 
 # Pure Rust
 oxipng = { version = "10", optional = true }

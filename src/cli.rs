@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(
     name = "imgoptim",
     version,
-    about = "Multi-format image optimizer/converter (JPEG/PNG/WebP) inspired by jpegoptim",
+    about = "Multi-format image optimizer/converter (JPEG/PNG/WebP + TIFF/JXL input) inspired by jpegoptim",
     disable_help_subcommand = true,
     arg_required_else_help = true
 )]
@@ -67,6 +67,8 @@ pub enum Fmt {
     Jpeg,
     Png,
     Webp,
+    Tiff,
+    Jxl,
 }
 
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
