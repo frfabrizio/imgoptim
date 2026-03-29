@@ -180,16 +180,11 @@ fn encode_jpeg(img: &DecodedJpeg, opts: &OptimizeOptions) -> ResultError<Vec<u8>
         .unwrap_or(75)
         .clamp(1, 100);
 
-    // Progressive: wire it here if you want it enabled.
-    // For now: explicit error rather than silently ignoring.
-    if opts.progressive {
-        return Err(ImgOptimError::InvalidArgs(
-            "JPEG progressive requested but not enabled in this backend yet.".into(),
-        ));
-    }
-
     let mut out = Vec::with_capacity(img.pixels.len() / 2);
-    let enc = je::Encoder::new(&mut out, q);
+    let mut enc = je::Encoder::new(&mut out, q);
+    if opts.progressive {
+        enc.set_progressive(true);
+    }
 
     let color = match img.color {
         JpegColor::L8 => je::ColorType::Luma,

@@ -424,6 +424,7 @@ dependencies = [
  "crc32fast",
  "filetime",
  "flate2",
+ "glob",
  "image",
  "jpeg-encoder",
  "once_cell",

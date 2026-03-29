@@ -239,6 +239,12 @@ pub fn run_ok(args: &[&str]) -> Assert {
 }
 
 #[allow(dead_code)]
+pub fn run_ok_with_input(args: &[&str], input: &str) -> Assert {
+    let mut cmd = imgoptim_cmd();
+    cmd.args(args).write_stdin(input).assert().success()
+}
+
+#[allow(dead_code)]
 pub fn expect_jpeg_out(dest: &Path, stem_with_suffix: &str) -> PathBuf {
     let candidates = [
         format!("{stem_with_suffix}.jpg"),

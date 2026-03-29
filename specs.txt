@@ -3,7 +3,6 @@ Spécification du fichier help de la ligne de commande imgoptim à implémenter 
 imgoptim v0.1.0
 Usage:
   imgoptim [global options] [format options] <filenames...>
-  imgoptim convert [global options] [convert options] <filenames...>
 
 GLOBAL OPTIONS
   -d<path>, --dest=<path>
@@ -20,6 +19,8 @@ GLOBAL OPTIONS
   -t, --totals      print totals after processing all files
   -q, --quiet       quiet mode
   -v, --verbose     verbose mode
+      --output-format <fmt>
+                    convert to output format without using subcommand
   -h, --help        display this help and exit
   -V, --version     print program version
 
@@ -27,7 +28,7 @@ NAMING / OUTPUT FILE POLICY
       --name-suffix <s>
                     append suffix before extension (e.g. "_imgoptim")
                     Example: "photo.jpeg" -> "photo_imgoptim.jpeg"
-                    Note: when used with `convert`, extension changes to target format
+                    Note: when converting, extension changes to target format
       --keep-ext        keep original extension (write alongside using suffix)
       --inplace         replace extension in destination (default if --dest not set)
 
@@ -60,13 +61,19 @@ COMMON QUALITY / LOSSY CONTROLS (mapped per format)
       --quality <q>     generic quality (0..100), format-specific mapping
 
 JPEG OPTIONS
-      --all-normal
-      --all-progressive
+      --jpeg-normal
+      --jpeg-progressive
       --jpeg-turbo      prefer libjpeg-turbo backend when available
 
 PNG OPTIONS
       --png-level <n>   compression level 0..9 (default: 6)
-      --zopfli          use Zopfli (very slow, best compression)
+      --png-zopfli      use Zopfli (very slow, best compression)
+      --zopfli-iteration-count <n>
+                    zopfli max iterations (recommended: 1..15)
+      --zopfli-max-block-splits <n>
+                    zopfli max block splits (0=unlimited, recommended: 0..15)
+      --zopfli-timeout <sec>
+                    zopfli timeout in seconds (recommended: 10..60)
 
 WEBP OPTIONS
       --webp-lossless       force lossless encoding (only supported mode)
@@ -75,10 +82,10 @@ WEBP OPTIONS
 
 CONVERSION
 Usage:
-  imgoptim convert [options] <filenames...>
+  imgoptim --output-format <fmt> [options] <filenames...>
 
 CONVERT OPTIONS
-      --output <fmt>    target format: jpeg,png,webp
+      --output-format <fmt>    target format: jpeg,png,webp
       --input <fmt>     only convert files matching input format (optional)
       --lossless        request lossless conversion when possible
       --lossy           allow lossy conversion when needed
@@ -86,13 +93,13 @@ CONVERT OPTIONS
                     background color for alpha removal when converting to JPEG
                     (e.g. #ffffff). Default: #ffffff
       --resize <spec>
-                    resize images: WxH, Wx, xH (convert only)
+                    resize images: WxH, Wx, xH (output-format only)
       --fit <mode>
                     fit mode for resize: contain, cover, stretch
 
 EXAMPLES
   imgoptim --name-suffix "_imgoptim" *.jpg
-  imgoptim convert --output webp --name-suffix "_imgoptim" images/*.png
+  imgoptim --output-format webp --name-suffix "_imgoptim" images/*.png
   imgoptim --tag-category "Optimisé" --strip-exif photos/*.jpg
 
 
@@ -128,15 +135,15 @@ Exemple : --only jpeg,png --skip png ⇒ seuls les JPEG restent.
 
 Si après filtrage il ne reste aucun fichier : code retour “succès” mais message (sauf --quiet).
 
-3) Choix action : optimize vs convert
+3) Choix action : optimize vs output-format
 
 imgoptim <files...> ⇒ optimisation (même format en sortie).
 
-imgoptim convert <files...> ⇒ conversion (format en sortie défini par --output).
+imgoptim --output-format <fmt> <files...> ⇒ conversion (format en sortie défini par --output).
 
-En mode convert, si --output n’est pas fourni ⇒ erreur (code retour ≠ 0).
+En mode output-format, si --output n’est pas fourni ⇒ erreur (code retour ≠ 0).
 
---input <fmt> en mode convert : ne convertit que les fichiers dont le format détecté correspond.
+--input <fmt> en mode output-format : ne convertit que les fichiers dont le format détecté correspond.
 
 Ne force pas un parse “au nom d’extension” : c’est la détection (magic bytes) qui tranche.
 
@@ -147,13 +154,13 @@ Par défaut : lossless quand le format/le pipeline le permet.
 
 Passage en lossy si (priorité) :
 
---size <...> est utilisé (optimisation/convert)
+--size <...> est utilisé (optimisation/output-format)
 
 un paramètre explicitement lossy est présent (--max, --quality, etc.)
 
-convert --lossy est fourni
+output-format --lossy est fourni
 
-4.2 Flags convert --lossless/--lossy
+4.2 Flags output-format --lossless/--lossy
 
 --lossless et --lossy sont mutuellement exclusifs.
 
@@ -242,7 +249,7 @@ En optimisation :
 
 En conversion :
 
---inplace : remplace l’extension par celle de --output.
+--inplace : remplace l’extension par celle de --output-format.
 
 --keep-ext : conserve l’extension d’origine et écrit avec suffixe obligatoire :
 
@@ -339,4 +346,4 @@ Code non-zéro si :
 
 au moins un fichier a rencontré une erreur bloquante
 
-ou options invalides / combinaison interdite (ex --inplace + --keep-ext, convert sans --output, --lossless + --lossy).
+ou options invalides / combinaison interdite (ex --inplace + --keep-ext, conversion sans --output-format, --lossless + --lossy).

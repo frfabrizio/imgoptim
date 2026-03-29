@@ -40,6 +40,10 @@ pub struct OptimizeOptions {
     // PNG
     pub png_level: Option<u8>,
     pub zopfli: bool,
+    pub zopfli_iteration_count: Option<u64>,
+    pub zopfli_max_block_splits: Option<u16>,
+    pub zopfli_timeout_secs: Option<u64>,
+    pub zopfli_progress: bool,
 
     // WebP
     pub webp_lossless: bool,
@@ -47,12 +51,24 @@ pub struct OptimizeOptions {
 }
 
 impl OptimizeOptions {
+    fn zopfli_requested(&self) -> bool {
+        self.zopfli
+            || self.zopfli_iteration_count.is_some()
+            || self.zopfli_max_block_splits.is_some()
+            || self.zopfli_timeout_secs.is_some()
+    }
+
     pub fn validate(&self, format: ImageFormat) -> ResultError<()> {
         match format {
             ImageFormat::Jpeg => {
                 if self.png_level.is_some() || self.zopfli {
                     return Err(ImgOptimError::InvalidArgs(
                         "PNG options are not valid for JPEG".into(),
+                    ));
+                }
+                if self.zopfli_requested() {
+                    return Err(ImgOptimError::InvalidArgs(
+                        "Zopfli options are not valid for JPEG".into(),
                     ));
                 }
                 if self.webp_lossless || self.webp_method.is_some() {
@@ -79,7 +95,7 @@ impl OptimizeOptions {
                         "progressive is not applicable to WebP".into(),
                     ));
                 }
-                if self.png_level.is_some() || self.zopfli {
+                if self.png_level.is_some() || self.zopfli_requested() {
                     return Err(ImgOptimError::InvalidArgs(
                         "PNG options are not valid for WebP".into(),
                     ));

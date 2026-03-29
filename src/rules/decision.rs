@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::{io, io::Write};
 
 use crate::cli::{Fmt, Mode, Opts, TargetSize};
 use crate::error::ImgOptimError;
@@ -25,6 +26,24 @@ struct Totals {
 
 static TOTALS: Lazy<Mutex<Totals>> = Lazy::new(|| Mutex::new(Totals::default()));
 
+#[derive(Clone, Copy)]
+struct ImageInfo {
+    width: u32,
+    height: u32,
+    bit_depth: u8,
+    has_exif: bool,
+}
+
+#[derive(Clone, Copy)]
+struct SummaryStats {
+    mode: Mode,
+    input_fmt: ImageFormat,
+    output_fmt: ImageFormat,
+    old_bytes: u64,
+    new_bytes: u64,
+    gain: f32,
+}
+
 /// Map internal ImageFormat -> CLI enum (for --only/--skip filtering)
 fn fmt_to_cli(fmt: ImageFormat) -> Fmt {
     match fmt {
@@ -47,12 +66,80 @@ fn passes_only_skip(fmt: ImageFormat, opts: &Opts) -> bool {
 }
 
 /// For threshold comparison, use existing output size if present, otherwise input size.
-fn old_size_for_target(input: &Path, out: &Path) -> Result<u64, ImgOptimError> {
-    if out.exists() {
+fn old_size_for_target(input: &Path, out: &Path, overwrite: bool) -> Result<u64, ImgOptimError> {
+    if out.exists() && !overwrite {
         Ok(std::fs::metadata(out)?.len())
     } else {
         Ok(std::fs::metadata(input)?.len())
     }
+}
+
+fn bit_depth_from_color(color: RawColor) -> u8 {
+    match color {
+        RawColor::L8 => 8,
+        RawColor::Rgb8 => 24,
+        RawColor::Rgba8 => 32,
+    }
+}
+
+fn image_info_from_raw(raw: &RawImage, input_fmt: ImageFormat, input_bytes: &[u8]) -> ImageInfo {
+    ImageInfo {
+        width: raw.width,
+        height: raw.height,
+        bit_depth: bit_depth_from_color(raw.color),
+        has_exif: crate::formats::metadata::has_exif(input_fmt, input_bytes),
+    }
+}
+
+fn format_jpegoptim_summary(input: &Path, info: ImageInfo, stats: SummaryStats) -> String {
+    let name = input
+        .file_name()
+        .map(|n| n.to_string_lossy())
+        .unwrap_or_else(|| input.display().to_string().into());
+    let mut details = format!(
+        "{name} {}x{} {}bit",
+        info.width, info.height, info.bit_depth
+    );
+    if stats.input_fmt == ImageFormat::Jpeg {
+        details.push_str(" N");
+    }
+    if info.has_exif {
+        details.push_str(" Exif");
+    }
+
+    let action = if stats.mode == Mode::Optimize && stats.input_fmt == stats.output_fmt {
+        "optimized."
+    } else {
+        "converted."
+    };
+
+    format!(
+        "{details} [OK] {} --> {} bytes ({:.2}%), {action}",
+        stats.old_bytes, stats.new_bytes, stats.gain
+    )
+}
+
+fn format_zopfli_status(opts: &Opts) -> String {
+    let iteration = opts
+        .zopfli_iteration_count
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "default".to_string());
+    let splits = opts
+        .zopfli_max_block_splits
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "default".to_string());
+    let timeout = opts
+        .zopfli_timeout_secs
+        .map(|v| format!("{v}s"))
+        .unwrap_or_else(|| "none".to_string());
+    format!("Zopfli: iteration_count={iteration} max_block_splits={splits} timeout={timeout}")
+}
+
+fn zopfli_requested(opts: &Opts) -> bool {
+    opts.zopfli
+        || opts.zopfli_iteration_count.is_some()
+        || opts.zopfli_max_block_splits.is_some()
+        || opts.zopfli_timeout_secs.is_some()
 }
 
 /// Build the codec-layer options expected by `formats::convert` (trait-based router).
@@ -87,6 +174,10 @@ fn build_optimize_options(
         // PNG
         png_level: opts.png_level,
         zopfli: opts.zopfli,
+        zopfli_iteration_count: opts.zopfli_iteration_count,
+        zopfli_max_block_splits: opts.zopfli_max_block_splits,
+        zopfli_timeout_secs: opts.zopfli_timeout_secs,
+        zopfli_progress: !matches!(opts.verbosity, crate::cli::Verbosity::Quiet),
 
         // WebP (lossless-only policy supported)
         webp_lossless,
@@ -132,6 +223,8 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
 
     // 6) Produce candidate output bytes via the new trait-based convert router
     let input_bytes = std::fs::read(input)?;
+    let want_details = !matches!(opts.verbosity, crate::cli::Verbosity::Quiet);
+    let mut info: Option<ImageInfo> = None;
 
     // Determine output format
     let out_fmt = match opts.mode {
@@ -151,6 +244,13 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
 
     // Build codec options expected by formats::convert
     let cv_opts = build_optimize_options(opts, out_fmt);
+
+    if zopfli_requested(opts)
+        && out_fmt == ImageFormat::Png
+        && !matches!(opts.verbosity, crate::cli::Verbosity::Quiet)
+    {
+        println!("{}", format_zopfli_status(opts));
+    }
 
     let background = if out_fmt == ImageFormat::Jpeg {
         let bg = opts
@@ -182,6 +282,9 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
 
     let mut new_bytes = if resize_spec.is_some() || opts.target_size_parsed.is_some() {
         let mut raw = decode_raw(&input_bytes, detected)?;
+        if want_details {
+            info = Some(image_info_from_raw(&raw, detected, &input_bytes));
+        }
         if let Some(spec) = resize_spec {
             let fit = opts
                 .convert
@@ -205,7 +308,7 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
             let (bytes, reached) =
                 encode_jpeg_to_target_size(&raw, &cv_opts, background, target_bytes, max_q)?;
             if !reached && !opts.force {
-                let old_bytes = old_size_for_target(input, &out_path)?;
+                let old_bytes = old_size_for_target(input, &out_path, opts.overwrite)?;
                 let summary = format!(
                     "{}: kept (target not reached) old={}B new={}B -> {}",
                     input.display(),
@@ -227,6 +330,10 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
         } else {
             encode_from_raw(&raw, out_fmt, &cv_opts, background)?
         }
+    } else if want_details {
+        let raw = decode_raw(&input_bytes, detected)?;
+        info = Some(image_info_from_raw(&raw, detected, &input_bytes));
+        encode_from_raw(&raw, out_fmt, &cv_opts, background)?
     } else {
         crate::formats::convert::convert_bytes_with_input(
             &input_bytes,
@@ -269,7 +376,7 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
     };
 
     // 7) Threshold decision BEFORE writing
-    let old_bytes = old_size_for_target(input, &out_path)?;
+    let old_bytes = old_size_for_target(input, &out_path, opts.overwrite)?;
     let new_len = new_bytes.len() as u64;
 
     let replace = should_replace(old_bytes, new_len, opts.threshold_percent, opts.force)?;
@@ -313,25 +420,77 @@ pub fn process_one(input: &Path, opts: &Opts) -> Result<String, ImgOptimError> {
         )));
     }
 
-    // 11) Atomic write
+    // 11) Ensure output directory exists (ask before creating)
+    ensure_output_dir(&out_path)?;
+
+    // 12) Atomic write
     let mut w = crate::io::atomic_write::AtomicWriter::new(&out_path)?;
     w.write_all(&new_bytes)?;
     w.commit(opts.overwrite)?;
 
-    // 12) Preserve timestamps
+    // 13) Preserve timestamps
     if opts.preserve {
         crate::io::fsmeta::preserve_timestamps(input, &out_path)?;
     }
 
-    let summary = format!(
-        "{}: {} -> {} (written, gain={:.2}%)",
-        input.display(),
-        detected,
-        out_path.display(),
-        gain
-    );
+    let summary = if let Some(info) = info {
+        let stats = SummaryStats {
+            mode: opts.mode,
+            input_fmt: detected,
+            output_fmt: out_fmt,
+            old_bytes,
+            new_bytes: new_len,
+            gain,
+        };
+        format_jpegoptim_summary(input, info, stats)
+    } else {
+        format!(
+            "{}: {} -> {} (written, gain={:.2}%)",
+            input.display(),
+            detected,
+            out_path.display(),
+            gain
+        )
+    };
     record_success(opts.mode, detected, out_fmt, old_bytes, new_len, true);
     Ok(summary)
+}
+
+fn ensure_output_dir(out_path: &Path) -> Result<(), ImgOptimError> {
+    let dir = out_path
+        .parent()
+        .ok_or_else(|| ImgOptimError::InvalidArgs("output has no parent directory".into()))?;
+
+    if dir.exists() {
+        return Ok(());
+    }
+
+    let mut stderr = io::stderr();
+    write!(
+        stderr,
+        "Destination directory does not exist: {}. Create it? [y/N]: ",
+        dir.display()
+    )?;
+    stderr.flush()?;
+
+    let mut input = String::new();
+    let bytes = io::stdin().read_line(&mut input)?;
+    if bytes == 0 {
+        return Err(ImgOptimError::InvalidArgs(
+            "destination directory does not exist; no input available".into(),
+        ));
+    }
+
+    let answer = input.trim().to_ascii_lowercase();
+    let yes = matches!(answer.as_str(), "y" | "yes" | "o" | "oui");
+    if yes {
+        std::fs::create_dir_all(dir)?;
+        Ok(())
+    } else {
+        Err(ImgOptimError::InvalidArgs(
+            "destination directory does not exist".into(),
+        ))
+    }
 }
 
 fn record_success(

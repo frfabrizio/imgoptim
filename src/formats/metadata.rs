@@ -50,6 +50,18 @@ pub fn apply_tag_category(
     }
 }
 
+pub fn has_exif(fmt: ImageFormat, input: &[u8]) -> bool {
+    match fmt {
+        ImageFormat::Jpeg => extract_jpeg_app1_payload(input, EXIF_APP1_ID).is_some(),
+        ImageFormat::Png => crate::formats::png::read_png_metadata(input)
+            .ok()
+            .flatten()
+            .and_then(|meta| meta.exif)
+            .is_some(),
+        ImageFormat::Webp => false,
+    }
+}
+
 pub fn preserve_metadata(
     input_fmt: ImageFormat,
     output_fmt: ImageFormat,
@@ -57,6 +69,15 @@ pub fn preserve_metadata(
     output: &[u8],
 ) -> Result<Vec<u8>, ImgOptimError> {
     match (input_fmt, output_fmt) {
+        (ImageFormat::Jpeg, ImageFormat::Jpeg) => {
+            let exif = extract_jpeg_app1_payload(input, EXIF_APP1_ID);
+            let xmp = extract_jpeg_app1_payload(input, XMP_APP1_ID);
+            if exif.is_some() || xmp.is_some() {
+                inject_jpeg_metadata(output, exif.as_deref(), xmp.as_deref())
+            } else {
+                Ok(output.to_vec())
+            }
+        }
         (ImageFormat::Png, ImageFormat::Jpeg) => {
             let meta = crate::formats::png::read_png_metadata(input)?;
             if let Some(meta) = meta {
