@@ -1,7 +1,7 @@
 //! Central module for image formats.
 //!
 //! This module exposes:
-//! - format-specific modules: `jpeg`, `png`, `webp` (1 file each, per your refactor)
+//! - format-specific modules: `jpeg`, `png`, `webp`, `tiff`, `jxl` (1 file each, per your refactor)
 //! - cross-format utilities: `detect`, `convert`, `resize`, metadata helpers, etc.
 //! - the `ImageFormat` enum + helpers
 //!
@@ -9,6 +9,8 @@
 //! - `jpeg`
 //! - `png`
 //! - `webp`
+//! - `tiff`
+//! - `jxl`
 
 pub mod convert;
 pub mod detect;
@@ -27,6 +29,12 @@ pub mod png;
 #[cfg(feature = "webp")]
 pub mod webp;
 
+#[cfg(feature = "tiff")]
+pub mod tiff;
+
+#[cfg(feature = "jxl")]
+pub mod jxl;
+
 use std::fmt;
 use std::path::Path;
 
@@ -40,6 +48,8 @@ pub enum ImageFormat {
     Jpeg,
     Png,
     Webp,
+    Tiff,
+    Jxl,
 }
 
 impl ImageFormat {
@@ -49,6 +59,8 @@ impl ImageFormat {
             ImageFormat::Jpeg => "jpeg",
             ImageFormat::Png => "png",
             ImageFormat::Webp => "webp",
+            ImageFormat::Tiff => "tiff",
+            ImageFormat::Jxl => "jxl",
         }
     }
 
@@ -58,6 +70,8 @@ impl ImageFormat {
             ImageFormat::Jpeg => &["jpg", "jpeg", "jpe"],
             ImageFormat::Png => &["png"],
             ImageFormat::Webp => &["webp"],
+            ImageFormat::Tiff => &["tif", "tiff"],
+            ImageFormat::Jxl => &["jxl"],
         }
     }
 
@@ -70,6 +84,8 @@ impl ImageFormat {
             "jpg" | "jpeg" | "jpe" => Some(ImageFormat::Jpeg),
             "png" => Some(ImageFormat::Png),
             "webp" => Some(ImageFormat::Webp),
+            "tif" | "tiff" => Some(ImageFormat::Tiff),
+            "jxl" => Some(ImageFormat::Jxl),
             _ => None,
         }
     }
@@ -88,6 +104,8 @@ impl ImageFormat {
             "image/jpeg" | "image/jpg" => Some(ImageFormat::Jpeg),
             "image/png" => Some(ImageFormat::Png),
             "image/webp" => Some(ImageFormat::Webp),
+            "image/tiff" => Some(ImageFormat::Tiff),
+            "image/jxl" => Some(ImageFormat::Jxl),
             _ => None,
         }
     }
@@ -110,5 +128,18 @@ pub fn is_built(fmt: ImageFormat) -> bool {
         ImageFormat::Jpeg => cfg!(feature = "jpeg"),
         ImageFormat::Png => cfg!(feature = "png"),
         ImageFormat::Webp => cfg!(feature = "webp"),
+        ImageFormat::Tiff => false,
+        ImageFormat::Jxl => false,
+    }
+}
+
+/// Read support for input formats (decode-only formats allowed).
+pub fn is_decodable(fmt: ImageFormat) -> bool {
+    match fmt {
+        ImageFormat::Jpeg => cfg!(feature = "jpeg"),
+        ImageFormat::Png => cfg!(feature = "png"),
+        ImageFormat::Webp => cfg!(feature = "webp"),
+        ImageFormat::Tiff => cfg!(feature = "tiff"),
+        ImageFormat::Jxl => cfg!(feature = "jxl"),
     }
 }

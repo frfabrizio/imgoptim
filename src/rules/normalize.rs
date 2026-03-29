@@ -70,6 +70,12 @@ pub fn normalize_options(mode: Mode, mut o: Opts) -> Result<Opts, ImgOptimError>
             ));
         }
 
+        if matches!(cv.output, crate::cli::Fmt::Tiff | crate::cli::Fmt::Jxl) {
+            return Err(ImgOptimError::InvalidArgs(
+                "--output tiff/jxl is not supported (input-only formats)".into(),
+            ));
+        }
+
         // v0.1: lossless conversion to JPEG is impossible
         if cv.lossless && cv.output == crate::cli::Fmt::Jpeg {
             return Err(ImgOptimError::InvalidArgs(

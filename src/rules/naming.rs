@@ -9,6 +9,8 @@ fn output_ext(fmt: ImageFormat) -> &'static str {
         ImageFormat::Jpeg => "jpg",
         ImageFormat::Png => "png",
         ImageFormat::Webp => "webp",
+        ImageFormat::Tiff => "tif",
+        ImageFormat::Jxl => "jxl",
     }
 }
 
@@ -49,6 +51,8 @@ pub fn make_output_path(
                 crate::cli::Fmt::Jpeg => ImageFormat::Jpeg,
                 crate::cli::Fmt::Png => ImageFormat::Png,
                 crate::cli::Fmt::Webp => ImageFormat::Webp,
+                crate::cli::Fmt::Tiff => ImageFormat::Tiff,
+                crate::cli::Fmt::Jxl => ImageFormat::Jxl,
             }
         }
     };
